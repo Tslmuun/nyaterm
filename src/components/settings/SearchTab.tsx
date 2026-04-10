@@ -1,181 +1,313 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MdAdd, MdDelete } from "react-icons/md";
+import { MdAdd, MdDelete, MdEdit, MdMoreHoriz, MdOpenInNew } from "react-icons/md";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/context/AppContext";
+import { cn } from "@/lib/utils";
+import type { SearchEngine } from "@/types/global";
 import { type QuickIconDef, SEARCH_ICONS } from "../icons";
+import { SettingSection } from "./SettingFormItems";
+
+type SearchEngineListItemProps = {
+  engine: SearchEngine;
+  index: number;
+  isOpen: boolean;
+  onDelete: (index: number) => void;
+  onOpenChange: (index: number, open: boolean) => void;
+  onPatch: (index: number, patch: Partial<SearchEngine>) => void;
+  onTest: (engine: SearchEngine) => void;
+};
+
+function SearchEngineListItem({
+  engine,
+  index,
+  isOpen,
+  onDelete,
+  onOpenChange,
+  onPatch,
+  onTest,
+}: SearchEngineListItemProps) {
+  const { t } = useTranslation();
+  const hasQueryPlaceholder = engine.url_template.includes("%s");
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={(open) => onOpenChange(index, open)}>
+      <div className="px-3 py-3 sm:px-4">
+        <div className="flex items-start gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background transition-colors hover:bg-secondary"
+                title={t("settings.selectIcon")}
+              >
+                {engine.icon && SEARCH_ICONS[engine.icon] ? (
+                  (() => {
+                    const Icon = SEARCH_ICONS[engine.icon].icon;
+                    return (
+                      <Icon
+                        className="text-base"
+                        style={{ color: SEARCH_ICONS[engine.icon].color }}
+                      />
+                    );
+                  })()
+                ) : (
+                  <MdAdd className="text-sm text-muted-foreground" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-50 w-48 max-w-[calc(100vw-2rem)] p-2">
+              <div className="grid max-h-48 grid-cols-6 gap-1 overflow-y-auto terminal-scroll">
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center justify-center rounded p-1 text-xs text-muted-foreground hover:bg-secondary"
+                  onSelect={() => onPatch(index, { icon: undefined })}
+                  title="Clear icon"
+                >
+                  ✕
+                </DropdownMenuItem>
+                {Object.entries(SEARCH_ICONS).map(([name, iconDef]) => {
+                  const Icon = (iconDef as QuickIconDef).icon;
+                  const color = (iconDef as QuickIconDef).color;
+                  return (
+                    <DropdownMenuItem
+                      key={name}
+                      className="flex cursor-pointer items-center justify-center rounded p-1 hover:bg-secondary"
+                      onSelect={() => onPatch(index, { icon: name })}
+                      title={name}
+                    >
+                      <Icon className="text-base" style={{ color }} />
+                    </DropdownMenuItem>
+                  );
+                })}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="min-w-0 flex-1 px-1 py-0.5 text-left">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">
+                  {engine.name || t("settings.engineName")}
+                </div>
+                <div
+                  className={cn(
+                    "mt-1 truncate text-xs",
+                    hasQueryPlaceholder ? "text-muted-foreground" : "text-destructive",
+                  )}
+                >
+                  {engine.url_template || t("settings.engineUrl")}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <label
+              className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"
+              title={t("settings.showInSearchMenu")}
+            >
+              <Switch
+                size="sm"
+                checked={engine.show_in_menu !== false}
+                onCheckedChange={(checked) => onPatch(index, { show_in_menu: checked })}
+              />
+            </label>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  title={t("settings.searchEngineActions")}
+                >
+                  <MdMoreHoriz className="text-[1rem]" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => onOpenChange(index, !isOpen)}>
+                  <MdEdit className="text-[0.95rem]" />
+                  {t("common.edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!hasQueryPlaceholder} onSelect={() => onTest(engine)}>
+                  <MdOpenInNew className="text-[0.95rem]" />
+                  {t("settings.testSearchEngine")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={() => onDelete(index)}>
+                  <MdDelete className="text-[0.95rem]" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+          <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+            <div className="space-y-2">
+              <Label
+                htmlFor={`search-engine-name-${index}`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                {t("settings.engineName")}
+              </Label>
+              <Input
+                id={`search-engine-name-${index}`}
+                placeholder={t("settings.engineName")}
+                className="text-sm"
+                value={engine.name}
+                onChange={(event) => onPatch(index, { name: event.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor={`search-engine-url-${index}`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                {t("settings.engineUrl")}
+              </Label>
+              <Input
+                id={`search-engine-url-${index}`}
+                placeholder="https://google.com/search?q=%s"
+                className="text-sm"
+                aria-invalid={!hasQueryPlaceholder}
+                value={engine.url_template}
+                onChange={(event) => onPatch(index, { url_template: event.target.value })}
+              />
+              <p
+                className={cn(
+                  "text-xs",
+                  hasQueryPlaceholder ? "text-muted-foreground" : "text-destructive",
+                )}
+              >
+                {hasQueryPlaceholder ? t("settings.engineUrlHint") : t("settings.engineUrlInvalid")}
+              </p>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
 
 export function SearchTab() {
   const { t } = useTranslation();
   const { appSettings, updateAppSettings } = useApp();
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
+  const engineCount = appSettings.search.custom_engines.length;
+
+  useEffect(() => {
+    if (pendingFocusIndex === null || engineCount === 0 || expandedIndex !== pendingFocusIndex) {
+      return;
+    }
+
+    const input = document.getElementById(
+      `search-engine-name-${pendingFocusIndex}`,
+    ) as HTMLInputElement | null;
+
+    if (!input) return;
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+      setPendingFocusIndex(null);
+    });
+  }, [engineCount, expandedIndex, pendingFocusIndex]);
+
+  function updateEngines(nextEngines: SearchEngine[]) {
+    updateAppSettings({ search: { ...appSettings.search, custom_engines: nextEngines } });
+  }
+
+  function patchEngine(index: number, patch: Partial<SearchEngine>) {
+    const nextEngines = [...appSettings.search.custom_engines];
+    nextEngines[index] = { ...nextEngines[index], ...patch };
+    updateEngines(nextEngines);
+  }
+
+  function addEngine() {
+    setExpandedIndex(0);
+    setPendingFocusIndex(0);
+    updateEngines([
+      {
+        name: "New Engine",
+        url_template: "https://example.com/search?q=%s",
+        show_in_menu: true,
+      },
+      ...appSettings.search.custom_engines,
+    ]);
+  }
+
+  function removeEngine(index: number) {
+    updateEngines(
+      appSettings.search.custom_engines.filter((_, currentIndex) => currentIndex !== index),
+    );
+
+    setExpandedIndex((current) => {
+      if (current === null) return current;
+      if (current === index) return null;
+      return current > index ? current - 1 : current;
+    });
+  }
+
+  function handleOpenChange(index: number, open: boolean) {
+    setExpandedIndex(open ? index : expandedIndex === index ? null : expandedIndex);
+  }
+
+  function testEngine(engine: SearchEngine) {
+    if (!engine.url_template.includes("%s")) return;
+    openUrl(engine.url_template.replace("%s", encodeURIComponent("dragonfly")));
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Label className="font-medium text-sm">{t("settings.customEngines")}</Label>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="text-primary"
-            onClick={() => {
-              const newEngines = [
-                ...appSettings.search.custom_engines,
-                { name: "New Engine", url_template: "https://example.com/search?q=%s" },
-              ];
-              updateAppSettings({ search: { ...appSettings.search, custom_engines: newEngines } });
-            }}
-          >
-            <MdAdd className="text-[0.875rem]" /> {t("common.add")}
+    <div className="space-y-5">
+      <SettingSection
+        title={t("settings.customEngines")}
+        desc={t("settings.engineUrlHint")}
+        action={
+          <Button variant="ghost" size="xs" className="text-primary" onClick={addEngine}>
+            <MdAdd className="text-[0.875rem]" />
+            {t("common.add")}
           </Button>
-        </div>
-
-        <div className="border rounded-md overflow-hidden">
-          {appSettings.search.custom_engines.map((engine, i) => (
-            <div
-              key={`${engine.name}-${engine.url_template}`}
-              className="flex flex-col gap-2 border-b p-3 transition-colors last:border-0 hover:bg-accent sm:flex-row sm:items-center"
-            >
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors hover:bg-secondary"
-                      title={t("settings.selectIcon")}
-                    >
-                      {engine.icon && SEARCH_ICONS[engine.icon] ? (
-                        (() => {
-                          const Icon = SEARCH_ICONS[engine.icon].icon;
-                          return (
-                            <Icon
-                              className="text-base"
-                              style={{ color: SEARCH_ICONS[engine.icon].color }}
-                            />
-                          );
-                        })()
-                      ) : (
-                        <MdAdd className="text-sm text-muted-foreground" />
-                      )}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="z-50 w-48 max-w-[calc(100vw-2rem)] p-2"
-                  >
-                    <div className="grid max-h-48 grid-cols-6 gap-1 overflow-y-auto terminal-scroll">
-                      <DropdownMenuItem
-                        className="flex cursor-pointer items-center justify-center rounded p-1 text-xs text-muted-foreground hover:bg-secondary"
-                        onSelect={() => {
-                          const newEngines = [...appSettings.search.custom_engines];
-                          newEngines[i] = { ...newEngines[i], icon: undefined };
-                          updateAppSettings({
-                            search: { ...appSettings.search, custom_engines: newEngines },
-                          });
-                        }}
-                        title="Clear icon"
-                      >
-                        ✕
-                      </DropdownMenuItem>
-                      {Object.entries(SEARCH_ICONS).map(([name, iconDef]) => {
-                        const Icon = (iconDef as QuickIconDef).icon;
-                        const color = (iconDef as QuickIconDef).color;
-                        return (
-                          <DropdownMenuItem
-                            key={name}
-                            className="flex cursor-pointer items-center justify-center rounded p-1 hover:bg-secondary"
-                            onSelect={() => {
-                              const newEngines = [...appSettings.search.custom_engines];
-                              newEngines[i] = { ...newEngines[i], icon: name };
-                              updateAppSettings({
-                                search: { ...appSettings.search, custom_engines: newEngines },
-                              });
-                            }}
-                            title={name}
-                          >
-                            <Icon className="text-base" style={{ color }} />
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive hover:bg-destructive/10 sm:hidden"
-                  title={t("common.delete")}
-                  onClick={() => {
-                    const newEngines = appSettings.search.custom_engines.filter(
-                      (_, idx) => idx !== i,
-                    );
-                    updateAppSettings({
-                      search: { ...appSettings.search, custom_engines: newEngines },
-                    });
-                  }}
-                >
-                  <MdDelete className="text-[1rem]" />
-                </Button>
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
-                <Input
-                  placeholder="Name"
-                  className="text-sm sm:w-40 sm:flex-none"
-                  value={engine.name}
-                  onChange={(e) => {
-                    const newEngines = [...appSettings.search.custom_engines];
-                    newEngines[i] = { ...newEngines[i], name: e.target.value };
-                    updateAppSettings({
-                      search: { ...appSettings.search, custom_engines: newEngines },
-                    });
-                  }}
-                />
-                <Input
-                  placeholder="URL Template (e.g. https://google.com/search?q=%s)"
-                  className="min-w-0 flex-1 text-sm"
-                  value={engine.url_template}
-                  onChange={(e) => {
-                    const newEngines = [...appSettings.search.custom_engines];
-                    newEngines[i] = { ...newEngines[i], url_template: e.target.value };
-                    updateAppSettings({
-                      search: { ...appSettings.search, custom_engines: newEngines },
-                    });
-                  }}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="hidden text-destructive hover:bg-destructive/10 sm:inline-flex"
-                title={t("common.delete")}
-                onClick={() => {
-                  const newEngines = appSettings.search.custom_engines.filter(
-                    (_, idx) => idx !== i,
-                  );
-                  updateAppSettings({
-                    search: { ...appSettings.search, custom_engines: newEngines },
-                  });
-                }}
-              >
-                <MdDelete className="text-[1rem]" />
-              </Button>
-            </div>
-          ))}
-          {appSettings.search.custom_engines.length === 0 && (
-            <div className="text-center py-6 text-xs text-muted-foreground">
-              {t("settings.noCustomEngines")}
-            </div>
-          )}
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">{t("settings.engineUrl")}</p>
-      </div>
+        }
+        contentClassName="space-y-3"
+      >
+        {appSettings.search.custom_engines.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-background/75 divide-y divide-border/60">
+            {appSettings.search.custom_engines.map((engine, index) => (
+              <SearchEngineListItem
+                key={`${engine.name}-${engine.url_template}-${index}`}
+                engine={engine}
+                index={index}
+                isOpen={expandedIndex === index}
+                onDelete={removeEngine}
+                onOpenChange={handleOpenChange}
+                onPatch={patchEngine}
+                onTest={testEngine}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
+            {t("settings.noCustomEngines")}
+          </div>
+        )}
+      </SettingSection>
     </div>
   );
 }

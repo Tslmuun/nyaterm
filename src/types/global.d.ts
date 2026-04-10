@@ -293,6 +293,7 @@ export interface SearchEngine {
   name: string;
   url_template: string;
   icon?: string;
+  show_in_menu?: boolean;
 }
 
 export interface SearchSettings {
