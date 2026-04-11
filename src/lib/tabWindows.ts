@@ -220,6 +220,36 @@ export function insertTabAfterInLeaf(
   });
 }
 
+export function insertTabIntoLeaf(
+  node: TerminalWindowNode,
+  leafId: string,
+  newTabId: string,
+  options?: {
+    afterTabId?: string | null;
+    activeTabId?: string | null;
+  },
+): TerminalWindowNode {
+  return updateLeafById(node, leafId, (currentLeaf) => {
+    const nextTabIds = [...currentLeaf.tabIds];
+    if (!nextTabIds.includes(newTabId)) {
+      const anchorTabId =
+        options?.afterTabId && nextTabIds.includes(options.afterTabId)
+          ? options.afterTabId
+          : currentLeaf.activeTabId && nextTabIds.includes(currentLeaf.activeTabId)
+            ? currentLeaf.activeTabId
+            : nextTabIds[nextTabIds.length - 1] ?? null;
+      const insertIndex = anchorTabId ? nextTabIds.indexOf(anchorTabId) + 1 : nextTabIds.length;
+      nextTabIds.splice(insertIndex, 0, newTabId);
+    }
+
+    return normalizeLeaf({
+      ...currentLeaf,
+      tabIds: nextTabIds,
+      activeTabId: options?.activeTabId === undefined ? currentLeaf.activeTabId : options.activeTabId,
+    });
+  });
+}
+
 export function reorderTabsInLeaf(
   node: TerminalWindowNode,
   fromTabId: string,

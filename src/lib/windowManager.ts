@@ -127,10 +127,24 @@ export function openSettings(tab?: string) {
 }
 
 export function openNewSession(editId?: string, autoConnect?: boolean) {
+  return openNewSessionWithTarget(editId, autoConnect);
+}
+
+export function openNewSessionWithTarget(
+  editId?: string,
+  autoConnect?: boolean,
+  target?: { targetLeafId?: string; anchorTabId?: string | null },
+) {
   let url = editId
     ? `index.html?window=new-session&edit=${encodeURIComponent(editId)}`
     : "index.html?window=new-session";
   if (autoConnect) url += "&autoConnect=1";
+  if (target?.targetLeafId) {
+    url += `&targetLeafId=${encodeURIComponent(target.targetLeafId)}`;
+  }
+  if (target?.anchorTabId) {
+    url += `&anchorTabId=${encodeURIComponent(target.anchorTabId)}`;
+  }
   return openChildWindow({
     label: "new-session",
     title: i18n.t(editId ? "dialog.editConnection" : "dialog.newConnection"),

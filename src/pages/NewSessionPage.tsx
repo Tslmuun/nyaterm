@@ -23,6 +23,8 @@ export default function NewSessionPage() {
   const params = new URLSearchParams(window.location.search);
   const editId = params.get("edit") ?? undefined;
   const autoConnect = params.get("autoConnect") === "1";
+  const targetLeafId = params.get("targetLeafId") ?? undefined;
+  const anchorTabId = params.get("anchorTabId") ?? undefined;
 
   const [initialData, setInitialData] = useState<SavedConnection | undefined>();
   const [name, setName] = useState("");
@@ -302,7 +304,11 @@ export default function NewSessionPage() {
       const savedId = await invoke<string>("save_connection", { connection });
       await emit("session-saved");
       if (autoConnect && (initialData?.id || savedId)) {
-        await emit("session-connect-after-edit", { connectionId: initialData?.id || savedId });
+        await emit("session-connect-after-edit", {
+          connectionId: initialData?.id || savedId,
+          targetLeafId,
+          anchorTabId,
+        });
       }
       resetForm();
       getCurrentWindow().close();
