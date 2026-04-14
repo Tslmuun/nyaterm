@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdRefresh } from "react-icons/md";
@@ -11,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { invoke } from "@/lib/invoke";
 
 export interface DeleteDialogData {
   sessionId: string;
@@ -108,6 +108,7 @@ export default function DeleteDialog({ data, onClose, onSuccess }: DeleteDialogP
             size="sm"
             onClick={handleDeleteSubmit}
             disabled={isSubmitting || data.items.length === 0}
+            autoFocus
           >
             {isSubmitting && <MdRefresh className="mr-1 text-[0.875rem] animate-spin" />}
             {t("fileExplorer.cmDelete")}
