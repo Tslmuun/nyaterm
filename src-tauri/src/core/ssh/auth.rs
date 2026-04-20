@@ -1,8 +1,10 @@
 use super::client::{SshAuth, SshConfig, SshHandler};
 use crate::error::{AppError, AppResult};
+use crate::observability::{self, StructuredLog, StructuredLogLevel};
 use russh::client::{self, KeyboardInteractiveAuthResponse};
 use russh::MethodKind;
 use serde::Serialize;
+use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
@@ -48,6 +50,46 @@ struct OtpRequestPayload {
     connection_name: String,
     prompts: Vec<OtpPrompt>,
     otp_entry_id: Option<String>,
+}
+
+fn build_ids(connection_id: Option<&str>, request_id: Option<&str>) -> Option<Value> {
+    let mut ids = Map::new();
+    if let Some(connection_id) = connection_id {
+        ids.insert(
+            "connection_id".to_string(),
+            Value::String(connection_id.to_string()),
+        );
+    }
+    if let Some(request_id) = request_id {
+        ids.insert("request_id".to_string(), Value::String(request_id.to_string()));
+    }
+    if ids.is_empty() {
+        None
+    } else {
+        Some(Value::Object(ids))
+    }
+}
+
+fn log_structured(
+    level: StructuredLogLevel,
+    domain: &str,
+    event: &str,
+    message: &str,
+    connection_id: Option<&str>,
+    request_id: Option<&str>,
+    data: Option<Value>,
+    error: Option<Value>,
+) {
+    observability::log_event(StructuredLog {
+        level,
+        domain: domain.to_string(),
+        event: event.to_string(),
+        message: message.to_string(),
+        ids: build_ids(connection_id, request_id),
+        data,
+        error,
+        client_timestamp: None,
+    });
 }
 
 pub(crate) fn load_saved_ssh_config(app: &AppHandle, connection_id: &str) -> AppResult<SshConfig> {
@@ -216,12 +258,20 @@ pub(super) async fn authenticate_handle(
 
     match &config.auth {
         SshAuth::Password { password } => {
-            tracing::info!(
-                host = %config.host,
-                port = config.port,
-                user = %config.username,
-                auth_mode = "password",
-                "Starting SSH authentication"
+            log_structured(
+                StructuredLogLevel::Info,
+                "ssh.auth",
+                "auth.start",
+                "Starting SSH authentication",
+                config.connection_id.as_deref(),
+                None,
+                Some(json!({
+                    "host": config.host,
+                    "port": config.port,
+                    "username": config.username,
+                    "auth_mode": "password",
+                })),
+                None,
             );
 
             let authenticated = handle
@@ -233,6 +283,7 @@ pub(super) async fn authenticate_handle(
                 handle,
                 &authenticated,
                 &config.username,
+                config.connection_id.as_deref(),
                 &config.name,
                 app,
                 password_error,
@@ -253,14 +304,22 @@ pub(super) async fn authenticate_handle(
                 .flatten()
                 .flatten();
 
-            tracing::info!(
-                host = %config.host,
-                port = config.port,
-                user = %config.username,
-                auth_mode = "publickey",
-                key_algorithm = %key.algorithm(),
-                rsa_hash = ?hash_alg,
-                "Starting SSH authentication"
+            log_structured(
+                StructuredLogLevel::Info,
+                "ssh.auth",
+                "auth.start",
+                "Starting SSH authentication",
+                config.connection_id.as_deref(),
+                None,
+                Some(json!({
+                    "host": config.host,
+                    "port": config.port,
+                    "username": config.username,
+                    "auth_mode": "publickey",
+                    "key_algorithm": key.algorithm().to_string(),
+                    "rsa_hash": format!("{hash_alg:?}"),
+                })),
+                None,
             );
 
             let authenticated = handle
@@ -275,6 +334,7 @@ pub(super) async fn authenticate_handle(
                 handle,
                 &authenticated,
                 &config.username,
+                config.connection_id.as_deref(),
                 &config.name,
                 app,
                 key_error,
@@ -285,11 +345,19 @@ pub(super) async fn authenticate_handle(
         }
     }
 
-    tracing::info!(
-        host = %config.host,
-        port = config.port,
-        user = %config.username,
-        "SSH authentication succeeded"
+    log_structured(
+        StructuredLogLevel::Info,
+        "ssh.auth",
+        "auth.succeeded",
+        "SSH authentication succeeded",
+        config.connection_id.as_deref(),
+        None,
+        Some(json!({
+            "host": config.host,
+            "port": config.port,
+            "username": config.username,
+        })),
+        None,
     );
 
     Ok(())
@@ -341,6 +409,7 @@ fn resolve_otp_info(app: &AppHandle, connection_id: &str) -> Option<OtpAutoFillI
 async fn finish_keyboard_interactive(
     handle: &mut client::Handle<SshHandler>,
     username: &str,
+    connection_id: Option<&str>,
     connection_name: &str,
     app: &AppHandle,
     mode: KeyboardInteractiveMode<'_>,
@@ -351,11 +420,18 @@ async fn finish_keyboard_interactive(
         .ok_or_else(|| AppError::Auth("PendingAuthManager not available".to_string()))?;
     let pending_mgr = pending_mgr.inner().clone();
 
-    tracing::info!(
-        connection_name,
-        username,
-        mode = mode.label(),
-        "Starting keyboard-interactive authentication"
+    log_structured(
+        StructuredLogLevel::Info,
+        "ssh.auth",
+        "keyboard_interactive.start",
+        "Starting keyboard-interactive authentication",
+        connection_id,
+        None,
+        Some(json!({
+            "username": username,
+            "mode": mode.label(),
+        })),
+        None,
     );
 
     let mut step = handle
@@ -366,11 +442,18 @@ async fn finish_keyboard_interactive(
     loop {
         match step {
             KeyboardInteractiveAuthResponse::Success => {
-                tracing::info!(
-                    connection_name,
-                    username,
-                    mode = mode.label(),
-                    "Keyboard-interactive authentication succeeded"
+                log_structured(
+                    StructuredLogLevel::Info,
+                    "ssh.auth",
+                    "keyboard_interactive.succeeded",
+                    "Keyboard-interactive authentication succeeded",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "mode": mode.label(),
+                    })),
+                    None,
                 );
                 return Ok(());
             }
@@ -378,13 +461,20 @@ async fn finish_keyboard_interactive(
                 remaining_methods,
                 partial_success,
             } => {
-                tracing::warn!(
-                    connection_name,
-                    username,
-                    mode = mode.label(),
-                    ?remaining_methods,
-                    partial_success,
-                    "Keyboard-interactive authentication failed"
+                log_structured(
+                    StructuredLogLevel::Warn,
+                    "ssh.auth",
+                    "keyboard_interactive.failed",
+                    "Keyboard-interactive authentication failed",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "mode": mode.label(),
+                        "remaining_methods": format!("{remaining_methods:?}"),
+                        "partial_success": partial_success,
+                    })),
+                    None,
                 );
                 return Err(AppError::Auth(
                     "Keyboard-interactive authentication failed".to_string(),
@@ -396,13 +486,20 @@ async fn finish_keyboard_interactive(
                 prompts,
             } => {
                 let hidden_prompts = prompts.iter().filter(|prompt| !prompt.echo).count();
-                tracing::debug!(
-                    connection_name,
-                    username,
-                    mode = mode.label(),
-                    prompt_count = prompts.len(),
-                    hidden_prompts,
-                    "Received keyboard-interactive prompts"
+                log_structured(
+                    StructuredLogLevel::Debug,
+                    "ssh.auth",
+                    "keyboard_interactive.prompts_received",
+                    "Received keyboard-interactive prompts",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "mode": mode.label(),
+                        "prompt_count": prompts.len(),
+                        "hidden_prompts": hidden_prompts,
+                    })),
+                    None,
                 );
 
                 let responses = if prompts.is_empty() {
@@ -411,18 +508,34 @@ async fn finish_keyboard_interactive(
                     .password()
                     .filter(|_| should_auto_fill_password_prompts(&prompts))
                 {
-                    tracing::info!(
-                        connection_name,
-                        username,
-                        "Auto-filling password for keyboard-interactive auth"
+                    log_structured(
+                        StructuredLogLevel::Info,
+                        "security.flow",
+                        "keyboard_interactive.password_autofill",
+                        "Auto-filling password for keyboard-interactive auth",
+                        connection_id,
+                        None,
+                        Some(json!({
+                            "username": username,
+                            "prompt_count": prompts.len(),
+                        })),
+                        None,
                     );
                     vec![password.to_string()]
                 } else if let Some(info) = otp_info.filter(|i| i.auto_fill) {
-                    tracing::info!(
-                        connection_name,
-                        username,
-                        otp_entry_id = %info.otp_id,
-                        "Auto-filling OTP for keyboard-interactive auth"
+                    log_structured(
+                        StructuredLogLevel::Info,
+                        "security.flow",
+                        "otp.auto_fill",
+                        "Auto-filling OTP for keyboard-interactive auth",
+                        connection_id,
+                        None,
+                        Some(json!({
+                            "username": username,
+                            "otp_entry_id": info.otp_id,
+                            "prompt_count": prompts.len(),
+                        })),
+                        None,
                     );
                     let result = crate::cmd::otp::generate_otp_for_entry(app, &info.otp_id)?;
                     prompts.iter().map(|_| result.code.clone()).collect()
@@ -442,12 +555,19 @@ async fn finish_keyboard_interactive(
                             .collect(),
                         otp_entry_id: otp_info.map(|i| i.otp_id.clone()),
                     };
-                    tracing::info!(
-                        connection_name,
-                        username,
-                        prompt_count = payload.prompts.len(),
-                        otp_entry_id = payload.otp_entry_id.as_deref(),
-                        "Forwarding keyboard-interactive prompts to frontend"
+                    log_structured(
+                        StructuredLogLevel::Info,
+                        "security.flow",
+                        "otp.requested",
+                        "Forwarding keyboard-interactive prompts to frontend",
+                        connection_id,
+                        Some(&request_id),
+                        Some(json!({
+                            "username": username,
+                            "prompt_count": payload.prompts.len(),
+                            "otp_entry_id": payload.otp_entry_id,
+                        })),
+                        None,
                     );
                     let _ = app.emit("otp-request", &payload);
 
@@ -483,6 +603,7 @@ async fn try_keyboard_interactive_after_partial(
     handle: &mut client::Handle<SshHandler>,
     auth_result: &client::AuthResult,
     username: &str,
+    connection_id: Option<&str>,
     connection_name: &str,
     app: &AppHandle,
     fallback_error: &str,
@@ -501,15 +622,23 @@ async fn try_keyboard_interactive_after_partial(
                 keyboard_interactive_available && password_fallback.is_some();
 
             if *partial_success && keyboard_interactive_available {
-                tracing::info!(
-                    connection_name,
-                    username,
-                    ?remaining_methods,
-                    "Primary auth partial success, continuing with keyboard-interactive"
+                log_structured(
+                    StructuredLogLevel::Info,
+                    "ssh.auth",
+                    "auth.partial_success",
+                    "Primary auth partial success, continuing with keyboard-interactive",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "remaining_methods": format!("{remaining_methods:?}"),
+                    })),
+                    None,
                 );
                 finish_keyboard_interactive(
                     handle,
                     username,
+                    connection_id,
                     connection_name,
                     app,
                     KeyboardInteractiveMode::AdditionalFactor,
@@ -517,24 +646,48 @@ async fn try_keyboard_interactive_after_partial(
                 )
                 .await
             } else if can_retry_with_password_fallback {
-                tracing::info!(
-                    connection_name,
-                    username,
-                    ?remaining_methods,
-                    "Password auth rejected, retrying with keyboard-interactive"
+                log_structured(
+                    StructuredLogLevel::Info,
+                    "ssh.auth",
+                    "auth.password_fallback",
+                    "Password auth rejected, retrying with keyboard-interactive",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "remaining_methods": format!("{remaining_methods:?}"),
+                    })),
+                    None,
                 );
                 let Some(mode) = password_fallback else {
                     return Err(AppError::Auth(fallback_error.to_string()));
                 };
-                finish_keyboard_interactive(handle, username, connection_name, app, mode, otp_info)
+                finish_keyboard_interactive(
+                    handle,
+                    username,
+                    connection_id,
+                    connection_name,
+                    app,
+                    mode,
+                    otp_info,
+                )
                     .await
             } else {
-                tracing::warn!(
-                    connection_name,
-                    username,
-                    ?remaining_methods,
-                    partial_success = *partial_success,
-                    "SSH authentication failed without usable keyboard-interactive fallback"
+                log_structured(
+                    StructuredLogLevel::Warn,
+                    "ssh.auth",
+                    "auth.failed",
+                    "SSH authentication failed without usable keyboard-interactive fallback",
+                    connection_id,
+                    None,
+                    Some(json!({
+                        "username": username,
+                        "remaining_methods": format!("{remaining_methods:?}"),
+                        "partial_success": partial_success,
+                    })),
+                    Some(json!({
+                        "message": fallback_error,
+                    })),
                 );
                 Err(AppError::Auth(fallback_error.to_string()))
             }

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { OtpCodePanel } from "@/components/panel/security-auth/OtpCodePanel";
@@ -13,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { invoke } from "@/lib/invoke";
+import { logger } from "@/lib/logger";
 
 export interface OtpPrompt {
   prompt: string;
@@ -59,8 +60,21 @@ export function OtpDialog({ request, onDone }: OtpDialogProps) {
         requestId: request.requestId,
         responses,
       });
-    } catch {
-      /* backend handles the error */
+      logger.info({
+        domain: "security.flow",
+        event: "otp.response_submitted",
+        message: "Submitted OTP response",
+        ids: { request_id: request.requestId },
+        data: { prompt_count: responses.length },
+      });
+    } catch (error) {
+      logger.error({
+        domain: "security.flow",
+        event: "otp.response_submit_failed",
+        message: "Failed to submit OTP response",
+        ids: { request_id: request.requestId },
+        error,
+      });
     }
     onDone();
   };
@@ -69,8 +83,20 @@ export function OtpDialog({ request, onDone }: OtpDialogProps) {
     if (!request) return;
     try {
       await invoke("cancel_otp_request", { requestId: request.requestId });
-    } catch {
-      /* ignore */
+      logger.info({
+        domain: "security.flow",
+        event: "otp.request_cancelled",
+        message: "Cancelled OTP request",
+        ids: { request_id: request.requestId },
+      });
+    } catch (error) {
+      logger.error({
+        domain: "security.flow",
+        event: "otp.request_cancel_failed",
+        message: "Failed to cancel OTP request",
+        ids: { request_id: request.requestId },
+        error,
+      });
     }
     onDone();
   };

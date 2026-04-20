@@ -1,9 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdChevronRight } from "react-icons/md";
 import PanelHeader from "@/components/layout/PanelHeader";
+import { invoke } from "@/lib/invoke";
 
 interface CommandHistoryProps {
   onCommandSend: (command: string) => void;

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdCheck, MdContentCopy } from "react-icons/md";
@@ -11,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApp } from "@/context/AppContext";
+import { invoke } from "@/lib/invoke";
 import type { TranslateResult } from "@/types/global";
 
 interface TranslationDialogProps {

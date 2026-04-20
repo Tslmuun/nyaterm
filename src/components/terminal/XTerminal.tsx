@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/invoke";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -17,10 +17,11 @@ import { useTerminalSearch } from "@/hooks/useTerminalSearch";
 import { useTerminalSettings } from "@/hooks/useTerminalSettings";
 import { readClipboardText } from "@/lib/clipboard";
 import { hexLuminance } from "@/lib/keywordHighlightPresets";
+import { logger } from "@/lib/logger";
 import {
   listenSessionInputPreview,
-  sendSessionInput,
   type SessionInputPreview,
+  sendSessionInput,
 } from "@/lib/sessionInput";
 import {
   applyTerminalInputData,
@@ -330,7 +331,14 @@ export default function XTerminal({
       if (!isAllowedLinkUri(uri)) return;
 
       removeLinkPopup();
-      openUrl(uri).catch((err: unknown) => console.error("Failed to open link:", err));
+      openUrl(uri).catch((err: unknown) =>
+        logger.error({
+          domain: "ui.error",
+          event: "terminal.link_open_failed",
+          message: "Failed to open link",
+          error: err,
+        }),
+      );
     };
 
     const oscLinkHandler: ILinkHandler = {
@@ -1059,10 +1067,7 @@ export default function XTerminal({
                   ? t("terminal.largeOutputProtectionActive")
                   : t("terminal.largeOutputProtectionRecovered")}
               </div>
-              <div
-                className="mt-1 leading-5"
-                style={{ color: "var(--df-text-dimmed)" }}
-              >
+              <div className="mt-1 leading-5" style={{ color: "var(--df-text-dimmed)" }}>
                 {t(
                   performanceOverlay === "overloaded"
                     ? "terminal.largeOutputProtectionActiveDetail"

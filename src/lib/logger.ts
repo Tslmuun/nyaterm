@@ -1,6 +1,38 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import type { DiagnosticsLogLevel } from "@/types/global";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
+
+type LogDomain =
+  | "app.lifecycle"
+  | "ui.action"
+  | "ui.error"
+  | "tauri.invoke"
+  | "settings.persistence"
+  | "session.lifecycle"
+  | "ssh.auth"
+  | "transfer.lifecycle"
+  | "watcher.sync"
+  | "security.flow"
+  | "updater.flow";
+
+type StableLogIdKey = "session_id" | "connection_id" | "transfer_id" | "tunnel_id" | "request_id";
+
+type LogIds = Partial<Record<StableLogIdKey, string>>;
+
+export interface LogPayload {
+  domain: LogDomain;
+  event: string;
+  message: string;
+  ids?: LogIds;
+  data?: unknown;
+  error?: unknown;
+}
+
+interface FrontendLogEntry extends LogPayload {
+  timestamp: string;
+  level: LogLevel;
+}
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -9,84 +41,284 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
-const MIN_LEVEL: LogLevel = import.meta.env.DEV ? "debug" : "warn";
+const DEFAULT_LEVEL: LogLevel = import.meta.env.DEV ? "debug" : "info";
+const BATCH_DELAY_MS = 250;
+const MAX_BATCH_SIZE = 50;
+
+let minLevel: LogLevel = DEFAULT_LEVEL;
+const queue: FrontendLogEntry[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushInFlight = false;
+let lifecycleFlushRegistered = false;
+
+export function setLoggerLevel(level: DiagnosticsLogLevel): void {
+  minLevel = level;
+}
 
 function shouldLog(level: LogLevel): boolean {
-  return LOG_LEVELS[level] >= LOG_LEVELS[MIN_LEVEL];
+  return LOG_LEVELS[level] >= LOG_LEVELS[minLevel];
 }
 
-function formatMessage(level: LogLevel, message: string): string {
-  const now = new Date();
-  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
-  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
-  return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function serializeLogArg(arg: unknown): string {
-  if (arg instanceof Error) {
-    return arg.stack ?? `${arg.name}: ${arg.message}`;
+function formatTimestamp(date = new Date()): string {
+  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+}
+
+function formatConsoleLine(entry: FrontendLogEntry): string {
+  return `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.domain}/${entry.event}] ${entry.message}`;
+}
+
+function normalizeError(error: unknown): unknown {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message_hash: hashString(error.message),
+      stack_hash: error.stack ? hashString(error.stack) : undefined,
+    };
+  }
+  return error;
+}
+
+function hashString(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function normalizeKey(key: string): string {
+  return key
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isRedactedKey(key: string): boolean {
+  const normalized = normalizeKey(key);
+  return (
+    normalized === "password" ||
+    normalized === "secret" ||
+    normalized === "token" ||
+    normalized === "otp" ||
+    normalized === "command" ||
+    normalized === "content" ||
+    normalized === "clipboard" ||
+    normalized === "passphrase" ||
+    normalized === "master_password" ||
+    normalized.endsWith("_password") ||
+    normalized.endsWith("_secret") ||
+    normalized.endsWith("_token") ||
+    normalized.endsWith("_otp") ||
+    normalized.endsWith("_command") ||
+    normalized.endsWith("_content") ||
+    normalized.endsWith("_clipboard") ||
+    normalized.endsWith("_passphrase") ||
+    normalized.includes("private_key") ||
+    normalized.includes("public_key") ||
+    normalized.includes("key_data") ||
+    normalized.includes("secret_key") ||
+    (normalized.endsWith("_key") && !normalized.endsWith("_id"))
+  );
+}
+
+function isHostKey(key: string): boolean {
+  const normalized = normalizeKey(key);
+  return normalized === "host" || normalized.endsWith("_host");
+}
+
+function isUsernameKey(key: string): boolean {
+  const normalized = normalizeKey(key);
+  return normalized === "username" || normalized === "user" || normalized.endsWith("_username");
+}
+
+function isPathKey(key: string): boolean {
+  const normalized = normalizeKey(key);
+  return normalized === "path" || normalized === "cwd" || normalized.endsWith("_path");
+}
+
+function sanitizeString(key: string | undefined, value: string): unknown {
+  if (!key) return value;
+  if (isRedactedKey(key)) return "[REDACTED]";
+  if (isHostKey(key)) return { type: "host", hash: hashString(value) };
+  if (isUsernameKey(key)) return { type: "username", hash: hashString(value) };
+  if (isPathKey(key)) {
+    const extension = (() => {
+      const lastDot = value.lastIndexOf(".");
+      if (lastDot <= value.lastIndexOf("/") || lastDot <= value.lastIndexOf("\\")) {
+        return undefined;
+      }
+      return value.slice(lastDot + 1);
+    })();
+    return {
+      type: "path",
+      hash: hashString(value),
+      ...(extension ? { extension } : {}),
+    };
+  }
+  return value;
+}
+
+function sanitizeValue(value: unknown, key?: string): unknown {
+  if (value instanceof Error) {
+    return sanitizeValue(normalizeError(value), key);
   }
 
-  if (typeof arg === "string") {
-    return arg;
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item, key));
   }
 
-  if (
-    typeof arg === "number" ||
-    typeof arg === "boolean" ||
-    typeof arg === "bigint" ||
-    typeof arg === "symbol" ||
-    arg == null
-  ) {
-    return String(arg);
+  if (typeof value === "string") {
+    return sanitizeString(key, value);
   }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([childKey, childValue]) => [
+        childKey,
+        sanitizeValue(childValue, childKey),
+      ]),
+    );
+  }
+
+  return value;
+}
+
+function normalizePayload(level: LogLevel, payload: LogPayload): FrontendLogEntry {
+  return {
+    ...payload,
+    timestamp: formatTimestamp(),
+    level,
+    ids: payload.ids ? (sanitizeValue(payload.ids, "ids") as LogIds) : undefined,
+    data: payload.data === undefined ? undefined : sanitizeValue(payload.data, "data"),
+    error:
+      payload.error === undefined
+        ? undefined
+        : sanitizeValue(normalizeError(payload.error), "error"),
+  };
+}
+
+function writeConsole(entry: FrontendLogEntry): void {
+  const line = formatConsoleLine(entry);
+  const extras = [entry.ids, entry.data, entry.error].filter((item) => item !== undefined);
+  switch (entry.level) {
+    case "debug":
+      console.debug(line, ...extras);
+      break;
+    case "info":
+      console.info(line, ...extras);
+      break;
+    case "warn":
+      console.warn(line, ...extras);
+      break;
+    case "error":
+      console.error(line, ...extras);
+      break;
+  }
+}
+
+function scheduleFlush(): void {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushQueue();
+  }, BATCH_DELAY_MS);
+}
+
+async function flushQueue(): Promise<void> {
+  if (flushInFlight) return;
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (queue.length === 0) return;
+
+  flushInFlight = true;
+  const batch = queue.splice(0, MAX_BATCH_SIZE);
 
   try {
-    return JSON.stringify(arg);
-  } catch {
-    return String(arg);
+    await tauriInvoke("append_frontend_logs", { entries: batch });
+  } catch (error) {
+    console.error(
+      `[${formatTimestamp()}] [ERROR] [ui.error/logger.flush_failed] Failed to persist frontend log batch`,
+      error,
+    );
+  } finally {
+    flushInFlight = false;
+    if (queue.length >= MAX_BATCH_SIZE) {
+      void flushQueue();
+    } else if (queue.length > 0) {
+      scheduleFlush();
+    }
   }
 }
 
-function persistLog(level: LogLevel, message: string, args: unknown[]): void {
-  if (level !== "warn" && level !== "error") {
-    return;
+function registerLifecycleFlush(): void {
+  if (lifecycleFlushRegistered) return;
+  if (typeof window === "undefined") return;
+
+  const flush = () => {
+    void flushQueue();
+  };
+
+  window.addEventListener("pagehide", flush);
+  window.addEventListener("beforeunload", flush);
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    });
   }
 
-  const context = args.map(serializeLogArg).join("\n");
-
-  void tauriInvoke("write_log", {
-    level,
-    message,
-    context: context || null,
-  }).catch(() => {});
+  lifecycleFlushRegistered = true;
 }
 
-/** Level-filtered logger: debug/info/warn/error. Respects DEV vs prod min level. */
+function emit(level: LogLevel, payload: LogPayload): void {
+  if (!shouldLog(level)) return;
+
+  const entry = normalizePayload(level, payload);
+  writeConsole(entry);
+  queue.push(entry);
+
+  if (level === "warn" || level === "error" || queue.length >= MAX_BATCH_SIZE) {
+    void flushQueue();
+  } else {
+    scheduleFlush();
+  }
+}
+
 export const logger = {
-  debug(message: string, ...args: unknown[]) {
-    if (shouldLog("debug")) {
-      console.debug(formatMessage("debug", message), ...args);
-    }
+  debug(payload: LogPayload) {
+    emit("debug", payload);
   },
 
-  info(message: string, ...args: unknown[]) {
-    if (shouldLog("info")) {
-      console.info(formatMessage("info", message), ...args);
-    }
+  info(payload: LogPayload) {
+    emit("info", payload);
   },
 
-  warn(message: string, ...args: unknown[]) {
-    if (shouldLog("warn")) {
-      console.warn(formatMessage("warn", message), ...args);
-      persistLog("warn", message, args);
-    }
+  warn(payload: LogPayload) {
+    emit("warn", payload);
   },
 
-  error(message: string, ...args: unknown[]) {
-    if (shouldLog("error")) {
-      console.error(formatMessage("error", message), ...args);
-      persistLog("error", message, args);
-    }
+  error(payload: LogPayload) {
+    emit("error", payload);
   },
+
+  flush(): Promise<void> {
+    return flushQueue();
+  },
+
+  createRequestId,
 };
+
+registerLifecycleFlush();

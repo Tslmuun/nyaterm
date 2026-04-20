@@ -2,6 +2,7 @@ use crate::config;
 use crate::core::ssh::{self, PendingAuthManager};
 use crate::core::{self, RecordingManager, SessionCommand, SessionInfo, SessionManager};
 use crate::error::{AppError, AppResult};
+use crate::observability::{self, StructuredLog, StructuredLogLevel};
 use crate::utils::fuzzy::{fuzzy_search_items, FuzzyResult};
 use std::sync::Arc;
 use tauri::Manager;
@@ -169,6 +170,17 @@ pub async fn close_session(
 ) -> AppResult<()> {
     let session_id_clone = session_id.clone();
 
+    observability::log_event(StructuredLog {
+        level: StructuredLogLevel::Info,
+        domain: "session.lifecycle".to_string(),
+        event: "session.close_requested".to_string(),
+        message: "Closing session".to_string(),
+        ids: Some(serde_json::json!({ "session_id": session_id.clone() })),
+        data: None,
+        error: None,
+        client_timestamp: None,
+    });
+
     let res = match state.send_command(&session_id, SessionCommand::Close).await {
         Err(AppError::SessionNotFound(_)) => Ok(()),
         other => other,
@@ -180,16 +192,31 @@ pub async fn close_session(
             let session_temp_dir = temp_dir.join("dragonfly").join(&session_id_clone);
             if session_temp_dir.exists() {
                 if let Err(e) = tokio::fs::remove_dir_all(&session_temp_dir).await {
-                    tracing::warn!(
-                        "Failed to clean up temp directory {}: {}",
-                        session_temp_dir.display(),
-                        e
-                    );
+                    observability::log_event(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "session.temp_cleanup_failed".to_string(),
+                        message: "Failed to clean up session temp directory".to_string(),
+                        ids: Some(serde_json::json!({ "session_id": session_id_clone })),
+                        data: Some(serde_json::json!({
+                            "temp_dir": session_temp_dir,
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                 } else {
-                    tracing::info!(
-                        "Successfully cleaned up temp directory for session: {}",
-                        session_id_clone
-                    );
+                    observability::log_event(StructuredLog {
+                        level: StructuredLogLevel::Info,
+                        domain: "session.lifecycle".to_string(),
+                        event: "session.temp_cleanup_succeeded".to_string(),
+                        message: "Cleaned up session temp directory".to_string(),
+                        ids: Some(serde_json::json!({ "session_id": session_id_clone })),
+                        data: Some(serde_json::json!({
+                            "temp_dir": session_temp_dir,
+                        })),
+                        error: None,
+                        client_timestamp: None,
+                    });
                 }
             }
         }
@@ -300,8 +327,28 @@ pub async fn submit_otp_response(
     responses: Vec<String>,
 ) -> AppResult<()> {
     if state.respond(&request_id, Some(responses)).await {
+        observability::log_event(StructuredLog {
+            level: StructuredLogLevel::Info,
+            domain: "security.flow".to_string(),
+            event: "otp.response_received".to_string(),
+            message: "Received OTP response from frontend".to_string(),
+            ids: Some(serde_json::json!({ "request_id": request_id })),
+            data: None,
+            error: None,
+            client_timestamp: None,
+        });
         Ok(())
     } else {
+        observability::log_event(StructuredLog {
+            level: StructuredLogLevel::Warn,
+            domain: "security.flow".to_string(),
+            event: "otp.response_rejected".to_string(),
+            message: "Rejected OTP response for missing request".to_string(),
+            ids: Some(serde_json::json!({ "request_id": request_id.clone() })),
+            data: None,
+            error: None,
+            client_timestamp: None,
+        });
         Err(AppError::Auth(format!(
             "No pending OTP request with id '{}'",
             request_id
@@ -314,6 +361,28 @@ pub async fn cancel_otp_request(
     state: tauri::State<'_, Arc<PendingAuthManager>>,
     request_id: String,
 ) -> AppResult<()> {
-    state.respond(&request_id, None).await;
+    let cancelled = state.respond(&request_id, None).await;
+    observability::log_event(StructuredLog {
+        level: if cancelled {
+            StructuredLogLevel::Info
+        } else {
+            StructuredLogLevel::Warn
+        },
+        domain: "security.flow".to_string(),
+        event: if cancelled {
+            "otp.request_cancelled".to_string()
+        } else {
+            "otp.request_cancel_missing".to_string()
+        },
+        message: if cancelled {
+            "Cancelled OTP request".to_string()
+        } else {
+            "OTP request was already missing when cancellation arrived".to_string()
+        },
+        ids: Some(serde_json::json!({ "request_id": request_id })),
+        data: None,
+        error: None,
+        client_timestamp: None,
+    });
     Ok(())
 }

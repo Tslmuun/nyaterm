@@ -1,49 +1,7 @@
 use std::sync::Arc;
 use tauri::Manager;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use crate::core::SessionManager;
-
-pub fn init_tracing(log_dir: std::path::PathBuf) {
-    let _ = std::fs::create_dir_all(&log_dir);
-
-    let file_appender = tracing_appender::rolling::Builder::new()
-        .rotation(tracing_appender::rolling::Rotation::DAILY)
-        .filename_prefix("dragonfly")
-        .filename_suffix("log")
-        .max_log_files(7)
-        .build(&log_dir)
-        .expect("failed to initialize rolling file appender");
-
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("dragonfly=info,user_action=debug,warn"));
-
-    let local_time = fmt::time::OffsetTime::local_rfc_3339().unwrap_or_else(|_| {
-        fmt::time::OffsetTime::new(
-            time::UtcOffset::UTC,
-            time::format_description::well_known::Rfc3339,
-        )
-    });
-
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(
-            fmt::layer()
-                .with_writer(file_appender)
-                .with_ansi(false)
-                .with_target(true)
-                .with_timer(local_time.clone()),
-        )
-        .with(
-            fmt::layer()
-                .with_writer(std::io::stderr)
-                .compact()
-                .with_timer(local_time),
-        )
-        .init();
-
-    tracing::info!("Dragonfly starting");
-}
 
 pub fn setup(
     app: &mut tauri::App,
@@ -54,8 +12,26 @@ pub fn setup(
         .home_dir()
         .map_err(|e: tauri::Error| e.to_string())?;
 
+    let settings_load = crate::config::load_app_settings(app.handle());
+    let diagnostics = settings_load
+        .as_ref()
+        .map(|settings| settings.diagnostics.clone())
+        .unwrap_or_default();
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
-    init_tracing(log_dir);
+    crate::observability::init_tracing(log_dir, &diagnostics);
+
+    if let Err(error) = settings_load {
+        crate::observability::log_event(crate::observability::StructuredLog {
+            level: crate::observability::StructuredLogLevel::Warn,
+            domain: "settings.persistence".to_string(),
+            event: "settings.load_failed".to_string(),
+            message: "Failed to load app settings before tracing initialization".to_string(),
+            ids: None,
+            data: None,
+            error: Some(serde_json::json!({ "message": error.to_string() })),
+            client_timestamp: None,
+        });
+    }
 
     session_manager.set_app_handle(app.handle().clone());
 

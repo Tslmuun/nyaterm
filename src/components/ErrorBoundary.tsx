@@ -23,7 +23,15 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    logger.error("Uncaught React error", error, info.componentStack);
+    logger.error({
+      domain: "ui.error",
+      event: "react.uncaught_error",
+      message: "Uncaught React error",
+      data: {
+        component_stack_length: info.componentStack?.length ?? 0,
+      },
+      error,
+    });
   }
 
   render() {

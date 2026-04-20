@@ -362,7 +362,13 @@ export default function SavedConnections({
       updateTabSession(tabId, sessionId);
     } catch (e) {
       const errorMessage = getErrorMessage(e);
-      logger.error(`Connection failed for "${conn.name}"`, e);
+      logger.error({
+        domain: "session.lifecycle",
+        event: "connection.open_failed",
+        message: "Connection failed",
+        ids: { connection_id: conn.id },
+        error: e,
+      });
       toast.error(t("savedConnections.connectionFailed", { error: errorMessage }));
       markTabConnectionFailed(tabId, errorMessage);
       if (shouldPromptConnectionEditOnFailure(conn, errorMessage)) {
@@ -718,7 +724,12 @@ export default function SavedConnections({
         await invoke("reorder_items", { connections: connsUpdates, groups: groupsUpdates });
       refreshConnections();
     } catch (err) {
-      logger.error("Drag drop failed", err);
+      logger.error({
+        domain: "ui.error",
+        event: "saved_connections.drag_drop_failed",
+        message: "Drag drop failed",
+        error: err,
+      });
     }
   };
 
@@ -778,7 +789,12 @@ export default function SavedConnections({
         }
       }
     } catch (err) {
-      logger.error("Drop to root failed", err);
+      logger.error({
+        domain: "ui.error",
+        event: "saved_connections.drop_to_root_failed",
+        message: "Drop to root failed",
+        error: err,
+      });
     }
   };
 

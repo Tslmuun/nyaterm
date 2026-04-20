@@ -1,44 +1,29 @@
-use serde::Deserialize;
+use std::sync::Arc;
 
+use crate::core::ssh::TunnelManager;
+use crate::core::SessionManager;
 use crate::error::AppResult;
+use crate::observability::{self, FrontendLogEntry};
 
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-    Debug,
-    Info,
-    Warn,
-    Error,
+#[tauri::command]
+pub fn append_frontend_logs(entries: Vec<FrontendLogEntry>) -> AppResult<()> {
+    for entry in entries {
+        observability::log_event(observability::frontend_log_to_structured(entry));
+    }
+    Ok(())
 }
 
 #[tauri::command]
-pub fn write_log(level: LogLevel, message: String, context: Option<String>) -> AppResult<()> {
-    match (level, context.as_deref()) {
-        (LogLevel::Debug, Some(context)) => {
-            tracing::debug!(source = "frontend", context = %context, "{message}");
-        }
-        (LogLevel::Debug, None) => {
-            tracing::debug!(source = "frontend", "{message}");
-        }
-        (LogLevel::Info, Some(context)) => {
-            tracing::info!(source = "frontend", context = %context, "{message}");
-        }
-        (LogLevel::Info, None) => {
-            tracing::info!(source = "frontend", "{message}");
-        }
-        (LogLevel::Warn, Some(context)) => {
-            tracing::warn!(source = "frontend", context = %context, "{message}");
-        }
-        (LogLevel::Warn, None) => {
-            tracing::warn!(source = "frontend", "{message}");
-        }
-        (LogLevel::Error, Some(context)) => {
-            tracing::error!(source = "frontend", context = %context, "{message}");
-        }
-        (LogLevel::Error, None) => {
-            tracing::error!(source = "frontend", "{message}");
-        }
-    }
-
-    Ok(())
+pub fn export_diagnostics(
+    app: tauri::AppHandle,
+    session_manager: tauri::State<'_, Arc<SessionManager>>,
+    tunnel_manager: tauri::State<'_, Arc<TunnelManager>>,
+    output_path: String,
+) -> AppResult<()> {
+    observability::export_diagnostics(
+        &app,
+        session_manager.inner().as_ref(),
+        tunnel_manager.inner().as_ref(),
+        &output_path,
+    )
 }

@@ -1,9 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { downloadDir, join, tempDir } from "@tauri-apps/api/path";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -69,6 +67,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useApp } from "@/context/AppContext";
+import { invoke } from "@/lib/invoke";
+import { logger } from "@/lib/logger";
 import { sendSessionInput } from "@/lib/sessionInput";
 import { formatSize } from "@/lib/utils";
 import { openAutoUpload } from "@/lib/windowManager";
@@ -229,7 +229,15 @@ export default function FileExplorer({ activeSessionId, activeSessionType }: Fil
             sessionId: session_id,
             localPath: local_path,
             remotePath: remote_path,
-          }).catch((err) => console.error("Auto upload failed", err));
+          }).catch((err) =>
+            logger.error({
+              domain: "watcher.sync",
+              event: "auto_upload.failed",
+              message: "Auto upload failed",
+              ids: { session_id },
+              error: err,
+            }),
+          );
         } else {
           // Trigger the window
           openAutoUpload({
@@ -809,7 +817,13 @@ export default function FileExplorer({ activeSessionId, activeSessionType }: Fil
         }
       }
     } catch (e) {
-      console.error("Download failed", e);
+      logger.error({
+        domain: "transfer.lifecycle",
+        event: "download.failed",
+        message: "Download failed",
+        ids: activeSessionId ? { session_id: activeSessionId } : undefined,
+        error: e,
+      });
     }
   };
 
@@ -853,12 +867,24 @@ export default function FileExplorer({ activeSessionId, activeSessionType }: Fil
             remotePath,
           });
         } catch (e) {
-          console.error("Upload failed", e);
+          logger.error({
+            domain: "transfer.lifecycle",
+            event: "upload.failed",
+            message: "Upload failed",
+            ids: { session_id: activeSessionId },
+            error: e,
+          });
           pendingManualRefreshUploadsRef.current.delete(uploadKey);
         }
       }
     } catch (e) {
-      console.error("Upload selection failed", e);
+      logger.error({
+        domain: "transfer.lifecycle",
+        event: "upload.selection_failed",
+        message: "Upload selection failed",
+        ids: { session_id: activeSessionId },
+        error: e,
+      });
     }
   };
 
@@ -878,7 +904,13 @@ export default function FileExplorer({ activeSessionId, activeSessionType }: Fil
       });
       loadDirectory(currentPath);
     } catch (e) {
-      console.error("Upload folder failed", e);
+      logger.error({
+        domain: "transfer.lifecycle",
+        event: "upload.folder_failed",
+        message: "Upload folder failed",
+        ids: { session_id: activeSessionId },
+        error: e,
+      });
     }
   };
 
@@ -895,7 +927,13 @@ export default function FileExplorer({ activeSessionId, activeSessionType }: Fil
         localPath,
       });
     } catch (e) {
-      console.error("Download for open failed", e);
+      logger.error({
+        domain: "transfer.lifecycle",
+        event: "download.open_failed",
+        message: "Download for open failed",
+        ids: { session_id: activeSessionId },
+        error: e,
+      });
       return;
     }
 

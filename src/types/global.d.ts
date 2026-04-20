@@ -452,6 +452,13 @@ export interface TransferSettings {
   recording_path: string;
 }
 
+export type DiagnosticsLogLevel = "warn" | "info" | "debug";
+
+export interface DiagnosticsSettings {
+  level: DiagnosticsLogLevel;
+  retention_days: number;
+}
+
 export interface TunnelConfig {
   id: string;
   name: string;
@@ -483,6 +490,7 @@ export interface AppSettings {
   terminal: TerminalSettings;
   interaction: InteractionSettings;
   transfer: TransferSettings;
+  diagnostics: DiagnosticsSettings;
   ui: UiConfig;
 }
 

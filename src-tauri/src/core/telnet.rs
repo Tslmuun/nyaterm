@@ -5,6 +5,7 @@ use super::session::{
 };
 use crate::core::SessionOutputCoalescer;
 use crate::error::AppResult;
+use crate::observability::{log_event, log_rate_limited, StructuredLog, StructuredLogLevel};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -113,7 +114,22 @@ pub async fn create_telnet_session(
     connection_id: Option<String>,
     name: String,
 ) -> AppResult<String> {
-    tracing::info!("Creating Telnet session to {}:{}", host, port);
+    log_event(StructuredLog {
+        level: StructuredLogLevel::Info,
+        domain: "session.lifecycle".to_string(),
+        event: "session.create_start".to_string(),
+        message: "Creating Telnet session".to_string(),
+        ids: connection_id
+            .as_ref()
+            .map(|value| serde_json::json!({ "connection_id": value })),
+        data: Some(serde_json::json!({
+            "session_type": "Telnet",
+            "host": host,
+            "port": port,
+        })),
+        error: None,
+        client_timestamp: None,
+    });
     let session_id = uuid::Uuid::new_v4().to_string();
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
 
@@ -152,13 +168,29 @@ async fn telnet_session_task(
     mut cmd_rx: mpsc::UnboundedReceiver<SessionCommand>,
     host: String,
     port: u16,
-    _connection_id: Option<String>,
+    connection_id: Option<String>,
 ) {
     let addr = format!("{}:{}", host, port);
     let stream = match TcpStream::connect(&addr).await {
         Ok(s) => s,
         Err(e) => {
-            tracing::error!("Telnet connection failed: {}", e);
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Error,
+                domain: "session.lifecycle".to_string(),
+                event: "session.connection_failed".to_string(),
+                message: "Telnet connection failed".to_string(),
+                ids: Some(serde_json::json!({
+                    "session_id": session_id.clone(),
+                    "connection_id": connection_id.clone(),
+                })),
+                data: Some(serde_json::json!({
+                    "session_type": "Telnet",
+                    "host": host,
+                    "port": port,
+                })),
+                error: Some(serde_json::json!({ "message": e.to_string() })),
+                client_timestamp: None,
+            });
             let _ = app.emit(
                 &format!("session-error-{}", session_id),
                 format!("Connection failed: {}", e),
@@ -177,6 +209,7 @@ async fn telnet_session_task(
     let app_reader = app.clone();
     let sid_reader = session_id.clone();
     let output_reader = output.clone();
+    let reader_connection_id = connection_id.clone();
 
     // Shared channel for negotiation responses from the reader to the writer
     let (negotiate_tx, mut negotiate_rx) = mpsc::unbounded_channel::<Vec<u8>>();
@@ -200,7 +233,21 @@ async fn telnet_session_task(
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Telnet read error: {}", e);
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "telnet.read_error".to_string(),
+                        message: "Telnet read error".to_string(),
+                        ids: Some(serde_json::json!({
+                            "session_id": sid_reader.clone(),
+                            "connection_id": reader_connection_id.clone(),
+                        })),
+                        data: Some(serde_json::json!({
+                            "session_type": "Telnet",
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                     break;
                 }
             }
@@ -213,7 +260,21 @@ async fn telnet_session_task(
         tokio::select! {
             Some(neg_data) = negotiate_rx.recv() => {
                 if let Err(e) = writer.write_all(&neg_data).await {
-                    tracing::warn!("Telnet negotiate write error: {}", e);
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "telnet.negotiate_write_error".to_string(),
+                        message: "Telnet negotiate write error".to_string(),
+                        ids: Some(serde_json::json!({
+                            "session_id": session_id.clone(),
+                            "connection_id": connection_id.clone(),
+                        })),
+                        data: Some(serde_json::json!({
+                            "session_type": "Telnet",
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                     break;
                 }
             }
@@ -224,7 +285,21 @@ async fn telnet_session_task(
                     }
                     Some(SessionCommand::Write(data)) => {
                         if let Err(e) = writer.write_all(&data).await {
-                            tracing::warn!("Telnet write error: {}", e);
+                            log_rate_limited(StructuredLog {
+                                level: StructuredLogLevel::Warn,
+                                domain: "session.lifecycle".to_string(),
+                                event: "telnet.write_error".to_string(),
+                                message: "Telnet write error".to_string(),
+                                ids: Some(serde_json::json!({
+                                    "session_id": session_id.clone(),
+                                    "connection_id": connection_id.clone(),
+                                })),
+                                data: Some(serde_json::json!({
+                                    "session_type": "Telnet",
+                                })),
+                                error: Some(serde_json::json!({ "message": e.to_string() })),
+                                client_timestamp: None,
+                            });
                             break;
                         }
                     }

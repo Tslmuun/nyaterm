@@ -1,5 +1,6 @@
 use crate::config;
 use crate::error::AppResult;
+use crate::observability::{self, StructuredLog, StructuredLogLevel};
 use crate::utils::crypto;
 
 #[tauri::command]
@@ -27,7 +28,22 @@ pub fn save_app_settings(
     app: tauri::AppHandle,
     mut settings: config::AppSettings,
 ) -> AppResult<()> {
-    let existing = config::load_app_settings(&app)?;
+    let existing = match config::load_app_settings(&app) {
+        Ok(existing) => existing,
+        Err(error) => {
+            observability::log_event(StructuredLog {
+                level: StructuredLogLevel::Error,
+                domain: "settings.persistence".to_string(),
+                event: "settings.load_failed".to_string(),
+                message: "Failed to load existing app settings before save".to_string(),
+                ids: None,
+                data: None,
+                error: Some(serde_json::json!({ "message": error.to_string() })),
+                client_timestamp: None,
+            });
+            return Err(error);
+        }
+    };
 
     match settings.security.master_password.as_deref() {
         Some("__SET__") => {
@@ -56,7 +72,24 @@ pub fn save_app_settings(
             settings.security.master_password = Some(crypto::encrypt_settings_secret(plain)?);
         }
     }
-    config::save_app_settings(&app, &settings)
+    if let Err(error) = config::save_app_settings(&app, &settings) {
+        observability::log_event(StructuredLog {
+            level: StructuredLogLevel::Error,
+            domain: "settings.persistence".to_string(),
+            event: "settings.save_failed".to_string(),
+            message: "Failed to persist app settings".to_string(),
+            ids: None,
+            data: Some(serde_json::json!({
+                "diagnostics_level": settings.diagnostics.level.as_str(),
+                "diagnostics_retention_days": settings.diagnostics.retention_days,
+            })),
+            error: Some(serde_json::json!({ "message": error.to_string() })),
+            client_timestamp: None,
+        });
+        return Err(error);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

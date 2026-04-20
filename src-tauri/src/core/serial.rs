@@ -5,6 +5,7 @@ use super::session::{
 };
 use crate::core::SessionOutputCoalescer;
 use crate::error::{AppError, AppResult};
+use crate::observability::{log_event, log_rate_limited, StructuredLog, StructuredLogLevel};
 use serialport::{DataBits, FlowControl, Parity, StopBits};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -59,13 +60,24 @@ pub async fn create_serial_session(
     app: AppHandle,
     manager: Arc<SessionManager>,
     config: SerialConfig,
-    _connection_id: Option<String>,
+    connection_id: Option<String>,
 ) -> AppResult<String> {
-    tracing::info!(
-        "Creating serial session on {} @ {} baud",
-        config.port_name,
-        config.baud_rate
-    );
+    log_event(StructuredLog {
+        level: StructuredLogLevel::Info,
+        domain: "session.lifecycle".to_string(),
+        event: "session.create_start".to_string(),
+        message: "Creating serial session".to_string(),
+        ids: connection_id
+            .as_ref()
+            .map(|value| serde_json::json!({ "connection_id": value })),
+        data: Some(serde_json::json!({
+            "session_type": "Serial",
+            "port_name": config.port_name.clone(),
+            "baud_rate": config.baud_rate,
+        })),
+        error: None,
+        client_timestamp: None,
+    });
 
     let session_id = uuid::Uuid::new_v4().to_string();
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
@@ -93,7 +105,7 @@ pub async fn create_serial_session(
     let rt_handle = tokio::runtime::Handle::current();
 
     std::thread::spawn(move || {
-        serial_session_thread(app, sid, mgr, cmd_rx, rt_handle, config);
+        serial_session_thread(app, sid, mgr, cmd_rx, rt_handle, config, connection_id);
     });
 
     Ok(session_id)
@@ -106,6 +118,7 @@ fn serial_session_thread(
     mut cmd_rx: mpsc::UnboundedReceiver<SessionCommand>,
     rt_handle: tokio::runtime::Handle,
     config: SerialConfig,
+    connection_id: Option<String>,
 ) {
     let port = match serialport::new(&config.port_name, config.baud_rate)
         .data_bits(parse_data_bits(config.data_bits))
@@ -117,7 +130,23 @@ fn serial_session_thread(
     {
         Ok(p) => p,
         Err(e) => {
-            tracing::error!("Failed to open serial port: {}", e);
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Error,
+                domain: "session.lifecycle".to_string(),
+                event: "session.connection_failed".to_string(),
+                message: "Failed to open serial port".to_string(),
+                ids: Some(serde_json::json!({
+                    "session_id": session_id.clone(),
+                    "connection_id": connection_id.clone(),
+                })),
+                data: Some(serde_json::json!({
+                    "session_type": "Serial",
+                    "port_name": config.port_name.clone(),
+                    "baud_rate": config.baud_rate,
+                })),
+                error: Some(serde_json::json!({ "message": e.to_string() })),
+                client_timestamp: None,
+            });
             let _ = app.emit(
                 &format!("session-error-{}", session_id),
                 format!("Failed to open serial port: {}", e),
@@ -159,7 +188,22 @@ fn serial_session_thread(
                     continue;
                 }
                 Err(e) => {
-                    tracing::warn!("Serial read error: {}", e);
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "serial.read_error".to_string(),
+                        message: "Serial read error".to_string(),
+                        ids: Some(serde_json::json!({
+                            "session_id": sid_reader.clone(),
+                            "connection_id": connection_id.clone(),
+                        })),
+                        data: Some(serde_json::json!({
+                            "session_type": "Serial",
+                            "port_name": config.port_name.clone(),
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                     break;
                 }
             }

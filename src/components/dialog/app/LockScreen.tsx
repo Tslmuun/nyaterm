@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdLock, MdLockOpen } from "react-icons/md";
+import { invoke } from "@/lib/invoke";
 import DragonflyLogo from "../../DragonflyLogo";
 
 interface LockScreenProps {

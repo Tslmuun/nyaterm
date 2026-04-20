@@ -3,6 +3,7 @@
 use super::{create_ssh_handle, SshHandle, SshRawHandle};
 use crate::config::{self, TunnelConfig};
 use crate::error::{AppError, AppResult};
+use crate::observability::{log_event, log_rate_limited, StructuredLog, StructuredLogLevel};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::AppHandle;
@@ -28,6 +29,10 @@ impl TunnelManager {
 
     pub async fn is_open(&self, tunnel_id: &str) -> bool {
         self.active.lock().await.contains_key(tunnel_id)
+    }
+
+    pub async fn active_count(&self) -> usize {
+        self.active.lock().await.len()
     }
 
     pub async fn open(&self, tunnel: &TunnelConfig, app: &AppHandle) -> AppResult<()> {
@@ -118,7 +123,25 @@ impl TunnelManager {
             },
         );
 
-        tracing::info!(tunnel_id = %tunnel.id, tunnel_type = %tunnel.tunnel_type, "Tunnel opened");
+        log_event(StructuredLog {
+            level: StructuredLogLevel::Info,
+            domain: "session.lifecycle".to_string(),
+            event: "tunnel.opened".to_string(),
+            message: "Tunnel opened".to_string(),
+            ids: Some(serde_json::json!({
+                "tunnel_id": tunnel.id.clone(),
+                "connection_id": tunnel.connection_id.clone(),
+            })),
+            data: Some(serde_json::json!({
+                "tunnel_type": tunnel.tunnel_type.clone(),
+                "listen_port": tunnel.listen_port,
+                "target_host": tunnel.target_host.clone(),
+                "target_port": tunnel.target_port,
+                "bind_localhost": tunnel.bind_localhost,
+            })),
+            error: None,
+            client_timestamp: None,
+        });
         Ok(())
     }
 
@@ -128,7 +151,16 @@ impl TunnelManager {
             if let Some(tx) = handle.shutdown_tx.take() {
                 let _ = tx.send(());
             }
-            tracing::info!(tunnel_id = %tunnel_id, "Tunnel closed");
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Info,
+                domain: "session.lifecycle".to_string(),
+                event: "tunnel.closed".to_string(),
+                message: "Tunnel closed".to_string(),
+                ids: Some(serde_json::json!({ "tunnel_id": tunnel_id })),
+                data: None,
+                error: None,
+                client_timestamp: None,
+            });
         }
     }
 
@@ -158,7 +190,19 @@ impl TunnelManager {
                                     ).await {
                                         Ok(ch) => ch,
                                         Err(e) => {
-                                            tracing::warn!("direct-tcpip failed: {}", e);
+                                            log_rate_limited(StructuredLog {
+                                                level: StructuredLogLevel::Warn,
+                                                domain: "session.lifecycle".to_string(),
+                                                event: "tunnel.direct_tcpip_failed".to_string(),
+                                                message: "Tunnel direct-tcpip failed".to_string(),
+                                                ids: None,
+                                                data: Some(serde_json::json!({
+                                                    "target_host": host,
+                                                    "target_port": target_port,
+                                                })),
+                                                error: Some(serde_json::json!({ "message": e.to_string() })),
+                                                client_timestamp: None,
+                                            });
                                             return;
                                         }
                                     }
@@ -168,7 +212,16 @@ impl TunnelManager {
                             });
                         }
                         Err(e) => {
-                            tracing::warn!("TCP accept failed: {}", e);
+                            log_rate_limited(StructuredLog {
+                                level: StructuredLogLevel::Warn,
+                                domain: "session.lifecycle".to_string(),
+                                event: "tunnel.accept_failed".to_string(),
+                                message: "Tunnel TCP accept failed".to_string(),
+                                ids: None,
+                                data: None,
+                                error: Some(serde_json::json!({ "message": e.to_string() })),
+                                client_timestamp: None,
+                            });
                         }
                     }
                 }
@@ -187,14 +240,35 @@ impl TunnelManager {
         {
             let handle = ssh_handle.lock().await;
             if let Err(e) = handle.tcpip_forward(&listen_addr, listen_port.into()).await {
-                tracing::warn!("tcpip_forward request failed: {}", e);
+                log_rate_limited(StructuredLog {
+                    level: StructuredLogLevel::Warn,
+                    domain: "session.lifecycle".to_string(),
+                    event: "tunnel.forward_request_failed".to_string(),
+                    message: "Remote tunnel forward request failed".to_string(),
+                    ids: None,
+                    data: Some(serde_json::json!({
+                        "listen_addr": listen_addr.clone(),
+                        "listen_port": listen_port,
+                    })),
+                    error: Some(serde_json::json!({ "message": e.to_string() })),
+                    client_timestamp: None,
+                });
                 return;
             }
         }
-        tracing::info!(
-            listen = %format!("{}:{}", listen_addr, listen_port),
-            "Remote tunnel forwarding requested"
-        );
+        log_event(StructuredLog {
+            level: StructuredLogLevel::Info,
+            domain: "session.lifecycle".to_string(),
+            event: "tunnel.forward_requested".to_string(),
+            message: "Remote tunnel forwarding requested".to_string(),
+            ids: None,
+            data: Some(serde_json::json!({
+                "listen_addr": listen_addr.clone(),
+                "listen_port": listen_port,
+            })),
+            error: None,
+            client_timestamp: None,
+        });
 
         let _ = shutdown_rx.await;
 
@@ -219,7 +293,16 @@ impl TunnelManager {
                             tokio::spawn(Self::handle_socks5_connection(stream, handle, peer_addr));
                         }
                         Err(e) => {
-                            tracing::warn!("SOCKS5 accept failed: {}", e);
+                            log_rate_limited(StructuredLog {
+                                level: StructuredLogLevel::Warn,
+                                domain: "session.lifecycle".to_string(),
+                                event: "tunnel.socks_accept_failed".to_string(),
+                                message: "SOCKS5 accept failed".to_string(),
+                                ids: None,
+                                data: None,
+                                error: Some(serde_json::json!({ "message": e.to_string() })),
+                                client_timestamp: None,
+                            });
                         }
                     }
                 }
@@ -316,7 +399,19 @@ impl TunnelManager {
         } {
             Ok(ch) => ch,
             Err(e) => {
-                tracing::warn!("SOCKS5 direct-tcpip failed: {}", e);
+                log_rate_limited(StructuredLog {
+                    level: StructuredLogLevel::Warn,
+                    domain: "session.lifecycle".to_string(),
+                    event: "tunnel.socks_direct_tcpip_failed".to_string(),
+                    message: "SOCKS5 direct-tcpip failed".to_string(),
+                    ids: None,
+                    data: Some(serde_json::json!({
+                        "target_host": target_host,
+                        "target_port": target_port,
+                    })),
+                    error: Some(serde_json::json!({ "message": e.to_string() })),
+                    client_timestamp: None,
+                });
                 let _ = stream
                     .write_all(&[0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
                     .await;
@@ -342,11 +437,21 @@ impl TunnelManager {
         for tunnel in &tunnels {
             if tunnel.auto_open && tunnel.connection_id.as_deref() == Some(connection_id) {
                 if let Err(e) = self.open(tunnel, app).await {
-                    tracing::warn!(
-                        tunnel_id = %tunnel.id,
-                        "Failed to auto-open tunnel: {}",
-                        e
-                    );
+                    log_event(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "tunnel.auto_open_failed".to_string(),
+                        message: "Failed to auto-open tunnel".to_string(),
+                        ids: Some(serde_json::json!({
+                            "tunnel_id": tunnel.id.clone(),
+                            "connection_id": connection_id,
+                        })),
+                        data: Some(serde_json::json!({
+                            "tunnel_type": tunnel.tunnel_type.clone(),
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                 }
             }
         }

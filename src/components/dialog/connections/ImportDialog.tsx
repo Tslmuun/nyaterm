@@ -42,7 +42,7 @@ const IMPORT_SOURCES: ImportSource[] = [
     icon: "/Xshell.svg",
     extensions: ["xts"],
     hint: ".xts",
-    type: "sessions"
+    type: "sessions",
   },
   {
     id: "mobaxterm",
@@ -89,7 +89,12 @@ export default function ImportDialog({ open, onClose }: ImportDialogProps) {
         toast.info(t("savedConnections.importSuccess", { count: 0 }));
       }
     } catch (e) {
-      logger.error("Import sessions failed", e);
+      logger.error({
+        domain: "settings.persistence",
+        event: "sessions.import_failed",
+        message: "Import sessions failed",
+        error: e,
+      });
       toast.error(t("savedConnections.importFailed", { error: e }));
     }
   };

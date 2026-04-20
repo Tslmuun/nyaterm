@@ -5,6 +5,7 @@ mod cmd;
 mod config;
 mod core;
 mod error;
+mod observability;
 mod utils;
 
 use std::sync::Arc;
@@ -32,7 +33,8 @@ pub fn run() {
         .on_window_event(app::on_window_event)
         .invoke_handler(tauri::generate_handler![
             cmd::clipboard::read_clipboard_text,
-            cmd::log::write_log,
+            cmd::log::append_frontend_logs,
+            cmd::log::export_diagnostics,
             cmd::settings::get_system_fonts,
             cmd::session::create_ssh_session,
             cmd::session::create_local_session,

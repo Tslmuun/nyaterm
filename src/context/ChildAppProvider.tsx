@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { AppSettings, Group, SavedConnection, UiConfig } from "@/types/global";
 import i18n from "../i18n";
 import { invoke } from "../lib/invoke";
-import { logger } from "../lib/logger";
+import { logger, setLoggerLevel } from "../lib/logger";
 import { DEFAULT_TERMINAL_FONT_SIZE } from "../lib/terminalFontSize";
 import { AppContext } from "./AppContext";
 
@@ -80,6 +80,10 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     default_editor: "",
     recording_path: "",
   },
+  diagnostics: {
+    level: "info",
+    retention_days: 7,
+  },
   ui: {
     open_tabs: [],
     left_width: 256,
@@ -121,6 +125,7 @@ export function ChildAppProvider({ children }: { children: ReactNode }) {
     invoke<AppSettings>("get_app_settings")
       .then((cfg) => {
         setAppSettings(cfg);
+        setLoggerLevel(cfg.diagnostics.level);
         loaded.current = true;
         setSettingsLoaded(true);
         if (cfg.ui?.language && cfg.ui.language !== i18n.language) {
@@ -142,11 +147,17 @@ export function ChildAppProvider({ children }: { children: ReactNode }) {
       setAppSettings((prev) => {
         const nextUpdates = typeof updates === "function" ? updates(prev) : updates;
         const next = { ...prev, ...nextUpdates };
+        setLoggerLevel(next.diagnostics.level);
         if (loaded.current) {
           if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
           saveTimerRef.current = setTimeout(() => {
             invoke("save_app_settings", { settings: next }).catch((e) =>
-              logger.error("Failed to save app settings", e),
+              logger.error({
+                domain: "settings.persistence",
+                event: "settings.save_failed",
+                message: "Failed to save app settings",
+                error: e,
+              }),
             );
             emit("settings-changed", next).catch(() => {});
           }, 500);
@@ -226,9 +237,5 @@ export function ChildAppProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { logger } from "./logger";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -28,7 +29,12 @@ export function parseJsonSearchParam<T>(value: string | null): T | null {
     // URLSearchParams.get() already returns a decoded value.
     return JSON.parse(value) as T;
   } catch (error) {
-    console.error("Failed to parse JSON search param", error);
+    logger.error({
+      domain: "ui.error",
+      event: "url_param.parse_failed",
+      message: "Failed to parse JSON search param",
+      error,
+    });
     return null;
   }
 }

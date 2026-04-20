@@ -30,14 +30,9 @@ async fn create_authenticated_connection(
         let jump_handler = SshHandler::new(app.clone(), jump_config.host.clone(), jump_config.port);
         let mut jump_handle =
             connect_with_proxy(jump_config, ssh_client_config.clone(), jump_handler).await?;
-        let jump_password_error = format!(
-            "Authentication failed for jump host '{}': invalid credentials",
-            jump_config.name
-        );
-        let jump_key_error = format!(
-            "Authentication failed for jump host '{}': key rejected",
-            jump_config.name
-        );
+        let jump_password_error =
+            "Authentication failed for jump host: invalid credentials".to_string();
+        let jump_key_error = "Authentication failed for jump host: key rejected".to_string();
         authenticate_handle(
             &mut jump_handle,
             jump_config,

@@ -7,6 +7,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::error::{AppError, AppResult};
+use crate::observability::{log_event, log_rate_limited, StructuredLog, StructuredLogLevel};
 
 #[derive(Clone, Serialize)]
 pub struct FileModifiedPayload {
@@ -70,7 +71,19 @@ pub async fn start_file_watch(
     let local_path_clone = local_path.clone();
     let remote_path_clone = remote_path.clone();
 
-    tracing::info!("Starting file watch for local path: {}", local_path);
+    log_event(StructuredLog {
+        level: StructuredLogLevel::Info,
+        domain: "watcher.sync".to_string(),
+        event: "watch.start".to_string(),
+        message: "Starting file watch".to_string(),
+        ids: Some(serde_json::json!({ "session_id": session_id })),
+        data: Some(serde_json::json!({
+            "local_path": local_path,
+            "remote_path": remote_path,
+        })),
+        error: None,
+        client_timestamp: None,
+    });
 
     // Spawn a blocking thread to listen for notify events
     std::thread::spawn(move || {
@@ -78,15 +91,15 @@ pub async fn start_file_watch(
         for res in rx {
             match res {
                 Ok(event) => {
-                    tracing::info!("Notify event received: {:?}", event.kind);
+                    tracing::debug!(kind = ?event.kind, "Notify event received");
 
                     // Most text editors do atomic saves (save to temp file, then rename/move)
                     // We need to catch Any/Data modify events inside the file OR rename events on the filepath
                     if let EventKind::Modify(_) = event.kind {
-                        tracing::info!("Detected Modify event on: {:?}", event.paths);
+                        tracing::debug!(paths = ?event.paths, "Detected modify event");
                         // Debounce: prevent emitting multiple times for a single save operation (common in editors)
                         if last_emit.elapsed() > Duration::from_millis(500) {
-                            tracing::info!("Debounce passed, emitting 'file-modified' payload...");
+                            tracing::debug!("Debounce passed, emitting file-modified payload");
                             last_emit = std::time::Instant::now();
                             let payload = FileModifiedPayload {
                                 session_id: session_id_clone.clone(),
@@ -94,15 +107,39 @@ pub async fn start_file_watch(
                                 remote_path: remote_path_clone.clone(),
                             };
                             if let Err(e) = app_clone.emit("file-modified", payload) {
-                                tracing::error!("Failed to emit file-modified event: {:?}", e);
+                                log_rate_limited(StructuredLog {
+                                    level: StructuredLogLevel::Error,
+                                    domain: "watcher.sync".to_string(),
+                                    event: "watch.emit_failed".to_string(),
+                                    message: "Failed to emit file-modified event".to_string(),
+                                    ids: Some(serde_json::json!({ "session_id": session_id_clone.clone() })),
+                                    data: Some(serde_json::json!({
+                                        "local_path": local_path_clone.clone(),
+                                        "remote_path": remote_path_clone.clone(),
+                                    })),
+                                    error: Some(serde_json::json!({ "message": e.to_string() })),
+                                    client_timestamp: None,
+                                });
                             }
                         } else {
-                            tracing::info!("Event debounced (too soon since last emit).");
+                            tracing::debug!("Watcher event debounced");
                         }
                     }
                 }
                 Err(e) => {
-                    tracing::error!("watch error: {:?}", e);
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Error,
+                        domain: "watcher.sync".to_string(),
+                        event: "watch.backend_error".to_string(),
+                        message: "File watcher backend error".to_string(),
+                        ids: Some(serde_json::json!({ "session_id": session_id_clone.clone() })),
+                        data: Some(serde_json::json!({
+                            "local_path": local_path_clone.clone(),
+                            "remote_path": remote_path_clone.clone(),
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
                     break;
                 }
             }

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +5,7 @@ import { MdClose, MdRefresh, MdSearch } from "react-icons/md";
 import PanelHeader from "@/components/layout/PanelHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { invoke } from "@/lib/invoke";
 import type { SessionInfo } from "@/types/global";
 
 interface ActiveSessionsProps {

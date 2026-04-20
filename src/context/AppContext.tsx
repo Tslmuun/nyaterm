@@ -37,7 +37,7 @@ import type {
   UiConfig,
 } from "@/types/global";
 import { invoke } from "../lib/invoke";
-import { logger } from "../lib/logger";
+import { logger, setLoggerLevel } from "../lib/logger";
 import { DEFAULT_TERMINAL_FONT_SIZE } from "../lib/terminalFontSize";
 
 interface AppContextType {
@@ -217,6 +217,10 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     default_editor: "",
     recording_path: "",
   },
+  diagnostics: {
+    level: "info",
+    retention_days: 7,
+  },
   ui: {
     open_tabs: [],
     left_width: 256,
@@ -285,6 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then((cfg) => {
         appSettingsRef.current = cfg;
         setAppSettings(cfg);
+        setLoggerLevel(cfg.diagnostics.level);
         appSettingsLoaded.current = true;
         setSettingsLoaded(true);
         if (cfg.security?.enable_screen_lock) {
@@ -309,11 +314,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const nextUpdates = typeof updates === "function" ? updates(prev) : updates;
         const next = { ...prev, ...nextUpdates };
         appSettingsRef.current = next;
+        setLoggerLevel(next.diagnostics.level);
         if (appSettingsLoaded.current) {
           if (appSettingsSaveTimerRef.current) clearTimeout(appSettingsSaveTimerRef.current);
           appSettingsSaveTimerRef.current = setTimeout(() => {
             invoke("save_app_settings", { settings: next }).catch((e) =>
-              logger.error("Failed to save app settings", e),
+              logger.error({
+                domain: "settings.persistence",
+                event: "settings.save_failed",
+                message: "Failed to save app settings",
+                error: e,
+              }),
             );
           }, 500);
         }
@@ -344,7 +355,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSavedConnections(saved);
       setSavedGroups(groups);
     } catch (e) {
-      logger.error("Failed to fetch connections", e);
+      logger.error({
+        domain: "ui.error",
+        event: "connections.fetch_failed",
+        message: "Failed to fetch connections",
+        error: e,
+      });
     }
   }, []);
 
@@ -750,7 +766,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 invoke<string>("create_ssh_session", { connectionId: cid })
                   .then((sessionId) => updatePaneSession(tab.id, pane.id, sessionId))
                   .catch((e) => {
-                    logger.error(`Restore SSH failed for ${pane.name}`, e);
+                    logger.error({
+                      domain: "session.lifecycle",
+                      event: "session.restore_failed",
+                      message: "Restore SSH failed",
+                      ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+                      data: {
+                        session_type: "SSH",
+                        pane_id: pane.id,
+                      },
+                      error: e,
+                    });
                     markPaneConnectionFailed(tab.id, pane.id, getErrorMessage(e));
                   });
                 break;
@@ -758,7 +784,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 invoke<string>("create_local_session", { connectionId: cid || null })
                   .then((sessionId) => updatePaneSession(tab.id, pane.id, sessionId))
                   .catch((e) => {
-                    logger.error("Restore Local failed", e);
+                    logger.error({
+                      domain: "session.lifecycle",
+                      event: "session.restore_failed",
+                      message: "Restore Local failed",
+                      data: {
+                        session_type: "Local",
+                        pane_id: pane.id,
+                      },
+                      error: e,
+                    });
                     markPaneConnectionFailed(tab.id, pane.id, getErrorMessage(e));
                   });
                 break;
@@ -770,7 +805,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 invoke<string>("create_telnet_session", { connectionId: cid })
                   .then((sessionId) => updatePaneSession(tab.id, pane.id, sessionId))
                   .catch((e) => {
-                    logger.error(`Restore Telnet failed for ${pane.name}`, e);
+                    logger.error({
+                      domain: "session.lifecycle",
+                      event: "session.restore_failed",
+                      message: "Restore Telnet failed",
+                      ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+                      data: {
+                        session_type: "Telnet",
+                        pane_id: pane.id,
+                      },
+                      error: e,
+                    });
                     markPaneConnectionFailed(tab.id, pane.id, getErrorMessage(e));
                   });
                 break;
@@ -782,7 +827,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 invoke<string>("create_serial_session", { connectionId: cid })
                   .then((sessionId) => updatePaneSession(tab.id, pane.id, sessionId))
                   .catch((e) => {
-                    logger.error(`Restore Serial failed for ${pane.name}`, e);
+                    logger.error({
+                      domain: "session.lifecycle",
+                      event: "session.restore_failed",
+                      message: "Restore Serial failed",
+                      ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+                      data: {
+                        session_type: "Serial",
+                        pane_id: pane.id,
+                      },
+                      error: e,
+                    });
                     markPaneConnectionFailed(tab.id, pane.id, getErrorMessage(e));
                   });
                 break;
@@ -864,11 +919,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }
 
 /** Hook to access AppContext. Throws if used outside AppProvider. */

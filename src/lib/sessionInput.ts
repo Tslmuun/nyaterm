@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 
 const SESSION_INPUT_PREVIEW_EVENT = "dragonfly:session-input-preview";
 

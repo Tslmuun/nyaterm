@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@/lib/invoke";
 import {
   canSuggestFromTracker,
   getTrackedCommand,

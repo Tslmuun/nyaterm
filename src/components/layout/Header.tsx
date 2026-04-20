@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BiServer } from "react-icons/bi";
+import { BiExport, BiImport, BiServer } from "react-icons/bi";
 import { GrUpgrade } from "react-icons/gr";
 import {
   MdAdd,
@@ -28,13 +28,13 @@ import {
   MdZoomIn,
   MdZoomOut,
 } from "react-icons/md";
-import { BiImport, BiExport } from "react-icons/bi";
 import packageJson from "@/../package.json";
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useConfigTransfer } from "@/hooks/useConfigTransfer";
 import { MOD } from "@/hooks/useGlobalShortcuts";
 import { AVAILABLE_LANGUAGES } from "@/i18n";
+import { logger } from "@/lib/logger";
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   decreaseTerminalFontSize,
@@ -284,7 +284,12 @@ export default function Header({
             const logDir = await appLogDir();
             await openPath(logDir);
           } catch (error) {
-            console.error("Failed to open logs:", error);
+            logger.error({
+              domain: "ui.error",
+              event: "logs.open_failed",
+              message: "Failed to open logs",
+              error,
+            });
           }
         },
       },

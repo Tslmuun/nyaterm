@@ -1,12 +1,21 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { SelectItem } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
+import { useConfigTransfer } from "@/hooks/useConfigTransfer";
 import { AVAILABLE_LANGUAGES } from "@/i18n";
-import { SettingRow, SettingSection, SettingSelect, SettingSwitch } from "./SettingFormItems";
+import {
+  SettingFieldGrid,
+  SettingRow,
+  SettingSection,
+  SettingSelect,
+  SettingSwitch,
+} from "./SettingFormItems";
 
 export function GeneralTab() {
   const { t, i18n } = useTranslation();
   const { appSettings, updateAppSettings, updateUi } = useApp();
+  const { handleExportDiagnostics, handleOpenLogs } = useConfigTransfer();
 
   return (
     <div className="space-y-5">
@@ -54,6 +63,67 @@ export function GeneralTab() {
               updateAppSettings({ general: { ...appSettings.general, confirm_on_close: v } })
             }
           />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection
+        title={t("settings.diagnostics")}
+        desc={t("settings.diagnosticsDesc")}
+        contentClassName="space-y-4"
+      >
+        <SettingFieldGrid>
+          <SettingSelect
+            label={t("settings.logLevel")}
+            desc={t("settings.logLevelDesc")}
+            value={appSettings.diagnostics.level}
+            onValueChange={(level) =>
+              updateAppSettings({
+                diagnostics: {
+                  ...appSettings.diagnostics,
+                  level: level as typeof appSettings.diagnostics.level,
+                },
+              })
+            }
+          >
+            <SelectItem value="warn">{t("settings.logLevelWarn")}</SelectItem>
+            <SelectItem value="info">{t("settings.logLevelInfo")}</SelectItem>
+            <SelectItem value="debug">{t("settings.logLevelDebug")}</SelectItem>
+          </SettingSelect>
+
+          <SettingSelect
+            label={t("settings.logRetention")}
+            desc={t("settings.logRetentionDesc")}
+            value={String(appSettings.diagnostics.retention_days)}
+            onValueChange={(retentionDays) =>
+              updateAppSettings({
+                diagnostics: {
+                  ...appSettings.diagnostics,
+                  retention_days: Number(retentionDays),
+                },
+              })
+            }
+          >
+            {[3, 7, 14, 30].map((days) => (
+              <SelectItem key={days} value={String(days)}>
+                {days} {t("common.days")}
+              </SelectItem>
+            ))}
+          </SettingSelect>
+        </SettingFieldGrid>
+
+        <SettingRow label={t("settings.openLogs")} desc={t("settings.openLogsDesc")}>
+          <Button variant="outline" size="sm" onClick={handleOpenLogs}>
+            {t("settings.openLogs")}
+          </Button>
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings.exportDiagnostics")}
+          desc={t("settings.exportDiagnosticsDesc")}
+        >
+          <Button size="sm" onClick={handleExportDiagnostics}>
+            {t("settings.exportDiagnostics")}
+          </Button>
         </SettingRow>
       </SettingSection>
     </div>

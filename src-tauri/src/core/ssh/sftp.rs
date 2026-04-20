@@ -6,6 +6,7 @@
 use super::SshConnectionHandles;
 use crate::core::SessionManager;
 use crate::error::{AppError, AppResult};
+use crate::observability::{log_event, StructuredLog, StructuredLogLevel};
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::{FileAttributes, FileType, OpenFlags};
 use serde::Serialize;
@@ -198,6 +199,10 @@ fn unregister_transfer(id: &str) {
 
 fn find_transfer(id: &str) -> Option<Arc<TransferController>> {
     ACTIVE_TRANSFERS.lock().unwrap().get(id).cloned()
+}
+
+pub(crate) fn active_transfer_count() -> usize {
+    ACTIVE_TRANSFERS.lock().unwrap().len()
 }
 
 async fn wait_for_transfer_ready(controller: &Arc<TransferController>) -> AppResult<()> {
@@ -567,7 +572,20 @@ pub async fn download_remote_file(
     let mut last_err = None;
     for attempt in 0..=max_retries {
         if attempt > 0 {
-            tracing::info!(attempt, "Retrying download of {}", remote_path);
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Info,
+                domain: "transfer.lifecycle".to_string(),
+                event: "transfer.retry".to_string(),
+                message: "Retrying download".to_string(),
+                ids: Some(serde_json::json!({ "session_id": session_id })),
+                data: Some(serde_json::json!({
+                    "direction": "download",
+                    "attempt": attempt,
+                    "remote_path": remote_path,
+                })),
+                error: None,
+                client_timestamp: None,
+            });
         }
         match download_remote_file_inner(
             &app,
@@ -896,7 +914,20 @@ pub async fn upload_local_file(
     let mut last_err = None;
     for attempt in 0..=max_retries {
         if attempt > 0 {
-            tracing::info!(attempt, "Retrying upload of {}", local_path);
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Info,
+                domain: "transfer.lifecycle".to_string(),
+                event: "transfer.retry".to_string(),
+                message: "Retrying upload".to_string(),
+                ids: Some(serde_json::json!({ "session_id": session_id })),
+                data: Some(serde_json::json!({
+                    "direction": "upload",
+                    "attempt": attempt,
+                    "local_path": local_path,
+                })),
+                error: None,
+                client_timestamp: None,
+            });
         }
         match upload_local_file_inner(
             &app,

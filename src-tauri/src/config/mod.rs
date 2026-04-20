@@ -35,9 +35,9 @@ pub use quick_command::{
 #[allow(unused_imports)]
 pub use settings::{
     load_app_settings, save_app_settings, ActionLinksMatcherSettings, AppSettings,
-    AppearanceSettings, GeneralSettings, InteractionSettings, KeywordHighlightRule, ProxySettings,
-    SearchEngine, SearchSettings, SecuritySettings, TerminalSettings, TransferSettings,
-    TranslationSettings,
+    AppearanceSettings, DiagnosticsLogLevel, DiagnosticsSettings, GeneralSettings,
+    InteractionSettings, KeywordHighlightRule, ProxySettings, SearchEngine, SearchSettings,
+    SecuritySettings, TerminalSettings, TransferSettings, TranslationSettings,
 };
 #[allow(unused_imports)]
 pub use tunnel::{load_tunnels, save_tunnels, TunnelConfig, TunnelsConfig};

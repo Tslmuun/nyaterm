@@ -226,9 +226,7 @@ function App() {
             setHelpDotVisible(true);
           }
         })
-        .catch((err) => {
-          console.warn("Update check failed:", err);
-        });
+        .catch(() => {});
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
@@ -615,7 +613,13 @@ function App() {
         await invoke("close_session", { sessionId: pane.sessionId });
         return true;
       } catch (error) {
-        logger.error("Failed to close session", error);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.close_failed",
+          message: "Failed to close session",
+          ids: { session_id: pane.sessionId },
+          error,
+        });
         return false;
       }
     },
@@ -638,7 +642,12 @@ function App() {
         await persistTabsNow();
         return true;
       } catch (error) {
-        logger.error("Failed to persist workspace tabs", error);
+        logger.error({
+          domain: "settings.persistence",
+          event: "workspace_tabs.persist_failed",
+          message: "Failed to persist workspace tabs",
+          error,
+        });
         toast.error(message);
         return false;
       }
@@ -710,7 +719,15 @@ function App() {
       .then((sessionId) => {
         addTab(sessionId, t("menu.newLocalTerminal"), "Local");
       })
-      .catch((e) => logger.error("Failed to create local session", e));
+      .catch((e) =>
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.create_failed",
+          message: "Failed to create local session",
+          data: { session_type: "Local" },
+          error: e,
+        }),
+      );
   }, [addTab, t]);
 
   const handleCloseActiveTab = useCallback(() => {
@@ -841,13 +858,24 @@ function App() {
           updateTabSession(tabId, sessionId);
         } catch (error) {
           const errorMessage = getErrorMessage(error);
-          logger.error("Failed to duplicate session", error);
+          logger.error({
+            domain: "session.lifecycle",
+            event: "session.duplicate_failed",
+            message: "Failed to duplicate session",
+            ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+            error,
+          });
           markTabConnectionFailed(tabId, errorMessage);
           maybePromptConnectionEdit(pane.connectionId, errorMessage, { sourceTabId: tabId });
           toast.error(t("tabCtx.duplicateFailed"));
         }
       } catch (error) {
-        logger.error("Failed to create duplicated tab", error);
+        logger.error({
+          domain: "ui.error",
+          event: "tab.duplicate_failed",
+          message: "Failed to create duplicated tab",
+          error,
+        });
         toast.error(t("tabCtx.duplicateFailed"));
       }
     },
@@ -879,7 +907,13 @@ function App() {
         toast.success(t("tabCtx.reconnectSuccess"));
       } catch (error) {
         const errorMessage = getErrorMessage(error);
-        logger.error("Failed to reconnect session", error);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.reconnect_failed",
+          message: "Failed to reconnect session",
+          ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+          error,
+        });
         maybePromptConnectionEdit(pane.connectionId, errorMessage, {
           sourceTabId: tab.id,
           sourcePaneId: pane.id,
@@ -915,7 +949,13 @@ function App() {
         toast.success(t("tabCtx.reconnectSuccess"));
       } catch (error) {
         const errorMessage = getErrorMessage(error);
-        logger.error("Failed to reconnect session from active sessions panel", error);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.reconnect_failed",
+          message: "Failed to reconnect session from active sessions panel",
+          ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+          error,
+        });
         maybePromptConnectionEdit(pane.connectionId, errorMessage, {
           sourceTabId: tab.id,
           sourcePaneId: pane.id,
@@ -972,7 +1012,13 @@ function App() {
         window.dispatchEvent(new CustomEvent("dragonfly:refresh-terminals"));
       } catch (error) {
         const errorMessage = getErrorMessage(error);
-        logger.error("Failed to create split session", error);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.split_failed",
+          message: "Failed to create split session",
+          ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+          error,
+        });
         if (newTabId) {
           markTabConnectionFailed(newTabId, errorMessage);
         }
@@ -1014,7 +1060,13 @@ function App() {
         updatePaneSession(tabId, paneId, newSessionId);
       } catch (error) {
         const errorMessage = getErrorMessage(error);
-        logger.error("Failed to reconnect pane", error);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "session.reconnect_failed",
+          message: "Failed to reconnect pane",
+          ids: pane.connectionId ? { connection_id: pane.connectionId } : undefined,
+          error,
+        });
         markPaneConnectionFailed(tabId, paneId, errorMessage);
         maybePromptConnectionEdit(pane.connectionId, errorMessage, {
           sourceTabId: tabId,
@@ -1058,7 +1110,13 @@ function App() {
         try {
           await invoke("close_session", { sessionId });
         } catch (error) {
-          logger.error("Failed to disconnect session outside workspace", error);
+          logger.error({
+            domain: "session.lifecycle",
+            event: "session.close_failed",
+            message: "Failed to disconnect session outside workspace",
+            ids: { session_id: sessionId },
+            error,
+          });
           toast.error(t("tabCtx.closeFailed"));
         }
         return;
@@ -1205,7 +1263,13 @@ function App() {
         });
         toast.success(t("recording.saved", { path: savedPath }));
       } catch (e) {
-        console.error("Failed to stop recording", e);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "recording.stop_failed",
+          message: "Failed to stop recording",
+          ids: { session_id: sessionId },
+          error: e,
+        });
       }
     } else {
       try {
@@ -1220,7 +1284,13 @@ function App() {
           return next;
         });
       } catch (e) {
-        console.error("Failed to start recording", e);
+        logger.error({
+          domain: "session.lifecycle",
+          event: "recording.start_failed",
+          message: "Failed to start recording",
+          ids: { session_id: sessionId },
+          error: e,
+        });
       }
     }
   }, [activePane, activeTab, appSettings.transfer.recording_path, recordingSessions, t]);

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { invoke } from "@/lib/invoke";
 import type { Group, OtpEntry, ProxyConfig, SavedConnection } from "@/types/global";
 
 export default function NewSessionPage() {
@@ -343,12 +343,9 @@ export default function NewSessionPage() {
               username,
               auth: {
                 mode: authType,
-                password_id:
-                  authType === "password" ? (passwordId || "") : undefined,
+                password_id: authType === "password" ? passwordId || "" : undefined,
                 password:
-                  authType === "password"
-                    ? password || (hasPassword ? undefined : "")
-                    : undefined,
+                  authType === "password" ? password || (hasPassword ? undefined : "") : undefined,
                 key_id: authType === "key" && keyId ? keyId : undefined,
                 otp_id: otpId || undefined,
                 auto_fill_otp: otpId ? autoFillOtp : undefined,

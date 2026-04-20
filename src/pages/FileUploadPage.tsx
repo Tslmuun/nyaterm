@@ -1,10 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { MdCloudSync } from "react-icons/md";
 import ChildWindowHeader from "@/components/layout/ChildWindowHeader";
 import { Button } from "@/components/ui/button";
+import { invoke } from "@/lib/invoke";
+import { logger } from "@/lib/logger";
 import { parseJsonSearchParam } from "@/lib/utils";
 
 export interface AutoUploadDialogData {
@@ -41,7 +42,13 @@ export default function AutoUploadPage() {
         remotePath: data.remotePath,
       });
     } catch (e) {
-      console.error("Upload failed", e);
+      logger.error({
+        domain: "transfer.lifecycle",
+        event: "upload.auto_upload_failed",
+        message: "Upload failed",
+        ids: { session_id: data.sessionId },
+        error: e,
+      });
     }
 
     handleClose();

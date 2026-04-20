@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { invoke } from "@/lib/invoke";
 import type { QuickCommand, QuickCommandCategory, QuickCommandsConfig } from "@/types/global";
 import { openQuickCommand } from "../../lib/windowManager";
 import VariablePromptDialog, {

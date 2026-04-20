@@ -1,4 +1,5 @@
 mod appearance;
+mod diagnostics;
 mod general;
 mod interaction;
 mod proxy;
@@ -9,6 +10,7 @@ mod transfer;
 mod translation;
 
 pub use appearance::AppearanceSettings;
+pub use diagnostics::{DiagnosticsLogLevel, DiagnosticsSettings};
 pub use general::GeneralSettings;
 pub use interaction::InteractionSettings;
 pub use proxy::ProxySettings;
@@ -44,6 +46,8 @@ pub struct AppSettings {
     pub interaction: InteractionSettings,
     #[serde(default)]
     pub transfer: TransferSettings,
+    #[serde(default)]
+    pub diagnostics: DiagnosticsSettings,
     #[serde(default)]
     pub ui: UiConfig,
 }

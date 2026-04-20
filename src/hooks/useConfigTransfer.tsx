@@ -1,4 +1,6 @@
+import { appLogDir } from "@tauri-apps/api/path";
 import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -43,7 +45,12 @@ export function useConfigTransfer() {
       await invoke("export_config", { outputPath: path });
       toast.success(t("settings.exportSuccess"));
     } catch (error) {
-      logger.error("Export config failed", error);
+      logger.error({
+        domain: "settings.persistence",
+        event: "config.export_failed",
+        message: "Export config failed",
+        error,
+      });
       toast.error(`${t("settings.exportFailed")}: ${error}`);
     }
   };
@@ -62,8 +69,50 @@ export function useConfigTransfer() {
       await invoke("import_config", { filePath: path });
       toast.success(t("settings.importSuccess"));
     } catch (error) {
-      logger.error("Import config failed", error);
+      logger.error({
+        domain: "settings.persistence",
+        event: "config.import_failed",
+        message: "Import config failed",
+        error,
+      });
       toast.error(`${t("settings.importFailed")}: ${error}`);
+    }
+  };
+
+  const handleOpenLogs = async () => {
+    try {
+      const logDir = await appLogDir();
+      await openPath(logDir);
+    } catch (error) {
+      logger.error({
+        domain: "ui.error",
+        event: "logs.open_failed",
+        message: "Failed to open logs",
+        error,
+      });
+      toast.error(t("settings.openLogsFailed"));
+    }
+  };
+
+  const handleExportDiagnostics = async () => {
+    const path = await saveFileDialog({
+      filters: [{ name: "Dragonfly Diagnostics", extensions: ["zip"] }],
+      defaultPath: "dragonfly-diagnostics.zip",
+    });
+
+    if (!path) return;
+
+    try {
+      await invoke("export_diagnostics", { outputPath: path });
+      toast.success(t("settings.exportDiagnosticsSuccess"));
+    } catch (error) {
+      logger.error({
+        domain: "settings.persistence",
+        event: "diagnostics.export_failed",
+        message: "Export diagnostics failed",
+        error,
+      });
+      toast.error(`${t("settings.exportDiagnosticsFailed")}: ${error}`);
     }
   };
 
@@ -94,6 +143,8 @@ export function useConfigTransfer() {
   return {
     handleExport,
     handleImport,
+    handleOpenLogs,
+    handleExportDiagnostics,
     passwordAlert,
   };
 }

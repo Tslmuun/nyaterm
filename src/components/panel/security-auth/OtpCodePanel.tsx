@@ -1,10 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdCheck, MdContentCopy, MdRefresh } from "react-icons/md";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useOtpCode } from "@/hooks/useOtpCode";
+import { invoke } from "@/lib/invoke";
 import type { OtpEntry } from "@/types/global";
 
 interface OtpCodePanelProps {
