@@ -211,6 +211,18 @@ export function getTrackedCommand(state: TerminalInputState): string {
   return sanitizeTerminalCommand(state.value);
 }
 
+export function canRegisterCommandFromTracker(state: TerminalInputState): boolean {
+  return !state.desynced && !state.multiline && !state.lineRewriteRequired;
+}
+
+export function getTrackedSubmissionCommand(state: TerminalInputState): string {
+  if (!canRegisterCommandFromTracker(state)) {
+    return "";
+  }
+
+  return sanitizeTerminalCommand(state.value);
+}
+
 export function canSuggestFromTracker(state: TerminalInputState): boolean {
   return (
     !state.desynced &&

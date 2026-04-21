@@ -28,7 +28,7 @@ import {
   applyTerminalInputPreview,
   canSuggestFromTracker,
   createTerminalInputState,
-  getTrackedCommand,
+  getTrackedSubmissionCommand,
 } from "@/lib/terminalInputTracker";
 import { XTERM_PERFORMANCE_CONFIG } from "@/lib/xtermPerformance";
 import ActionLinkMenu from "./ActionLinkMenu";
@@ -834,7 +834,7 @@ export default function XTerminal({
         }
       }
 
-      const command = data === "\r" ? getTrackedCommand(inputStateRef.current) : "";
+      const command = data === "\r" ? getTrackedSubmissionCommand(inputStateRef.current) : "";
       inputStateRef.current = applyTerminalInputData(inputStateRef.current, data);
       syncSuggestionsWithInputState();
 
