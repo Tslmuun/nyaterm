@@ -20,7 +20,7 @@ export type TerminalWindowNode = TerminalWindowLeaf | TerminalWindowSplit;
 
 let terminalWindowIdCounter = 0;
 
-function createTerminalWindowId(prefix: string) {
+export function createTerminalWindowId(prefix: string) {
   terminalWindowIdCounter += 1;
   return `${prefix}-${Date.now()}-${terminalWindowIdCounter}`;
 }

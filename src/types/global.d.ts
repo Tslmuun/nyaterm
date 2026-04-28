@@ -1,6 +1,17 @@
 /** Type of terminal session. */
 export type SessionType = "SSH" | "Local" | "Telnet" | "Serial";
 
+/** A group of sessions whose terminal input is broadcast to all members. */
+export interface SyncGroup {
+  id: string;
+  name: string;
+  color: string;
+  sessionIds: string[];
+  /** Session ids that are temporarily paused (still members, but not broadcasting). */
+  pausedSessionIds: string[];
+  enabled: boolean;
+}
+
 /** Split orientation inside a workspace tab. */
 export type PaneSplitDirection = "horizontal" | "vertical";
 

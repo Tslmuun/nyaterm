@@ -8,9 +8,13 @@ import { GrUpgrade } from "react-icons/gr";
 import {
   MdAdd,
   MdArticle,
+  MdCellTower,
   MdComputer,
   MdContentCopy,
   MdContentPaste,
+  MdDashboard,
+  MdDeleteSweep,
+  MdFitScreen,
   MdInfo,
   MdMenu,
   MdMenuBook,
@@ -18,6 +22,10 @@ import {
   MdRestartAlt,
   MdSelectAll,
   MdSettings,
+  MdSplitscreen,
+  MdSwapHoriz,
+  MdSwapVert,
+  MdSync,
   MdTerminal,
   MdTranslate,
   MdUpdate,
@@ -81,6 +89,15 @@ const iconMap: Record<string, React.ElementType> = {
   settings: MdSettings,
   file_export: BiExport,
   file_import: BiImport,
+  splitscreen: MdSplitscreen,
+  dashboard: MdDashboard,
+  swap_horiz: MdSwapHoriz,
+  swap_vert: MdSwapVert,
+  sync: MdSync,
+  cell_tower: MdCellTower,
+  delete_sweep: MdDeleteSweep,
+  fit_screen: MdFitScreen,
+  terminal: MdTerminal,
 };
 
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
@@ -100,6 +117,12 @@ interface HeaderProps {
   onHelpMenuOpen?: () => void;
   activeTab?: Tab | null;
   savedConnections?: SavedConnection[];
+  onSmartSplit?: (mode: "auto" | "horizontal" | "vertical") => void;
+  onManageSyncGroups?: () => void;
+  onBroadcastToAll?: () => void;
+  broadcastToAll?: boolean;
+  onClearTerminal?: () => void;
+  onResetTerminalSize?: () => void;
 }
 
 interface MenuItem {
@@ -124,6 +147,12 @@ export default function Header({
   onHelpMenuOpen,
   activeTab,
   savedConnections,
+  onSmartSplit,
+  onManageSyncGroups,
+  onBroadcastToAll,
+  broadcastToAll,
+  onClearTerminal,
+  onResetTerminalSize,
 }: HeaderProps) {
   const [appWindow] = useState(() => getCurrentWindow());
   const { themeName, setTheme, themeNames } = useTheme();
@@ -193,6 +222,7 @@ export default function Header({
   const menuKeys = [
     { key: "file", label: t("menu.file") },
     { key: "view", label: t("menu.view") },
+    { key: "terminal", label: t("menu.terminal") },
     { key: "help", label: t("menu.help") },
   ];
 
@@ -253,6 +283,61 @@ export default function Header({
         action: handleResetZoom,
         icon: "restart_alt",
         shortcut: `${MOD}+0`,
+      },
+    ],
+    terminal: [
+      {
+        label: t("menu.smartSplit"),
+        icon: "splitscreen",
+        submenu: [
+          {
+            label: t("menu.autoTile"),
+            icon: "dashboard",
+            action: () => onSmartSplit?.("auto"),
+          },
+          {
+            label: t("menu.tileHorizontally"),
+            icon: "swap_horiz",
+            action: () => onSmartSplit?.("horizontal"),
+          },
+          {
+            label: t("menu.tileVertically"),
+            icon: "swap_vert",
+            action: () => onSmartSplit?.("vertical"),
+          },
+        ],
+      },
+      { label: "separator", separator: true },
+      {
+        label: t("menu.syncInput"),
+        icon: "sync",
+        submenu: [
+          {
+            label: t("menu.manageGroups"),
+            icon: "settings",
+            action: () => onManageSyncGroups?.(),
+            shortcut: `${MOD}+Shift+G`,
+          },
+        ],
+      },
+      { label: "separator", separator: true },
+      {
+        label: t("menu.broadcastToAll"),
+        icon: "cell_tower",
+        action: () => onBroadcastToAll?.(),
+        checked: broadcastToAll,
+      },
+      { label: "separator", separator: true },
+      {
+        label: t("menu.clearTerminal"),
+        icon: "delete_sweep",
+        action: () => onClearTerminal?.(),
+        shortcut: `${MOD}+Shift+K`,
+      },
+      {
+        label: t("menu.resetTerminalSize"),
+        icon: "fit_screen",
+        action: () => onResetTerminalSize?.(),
       },
     ],
     help: [
@@ -323,7 +408,8 @@ export default function Header({
             item.action?.();
           }}
         >
-          {item.label}
+          <span className="flex-1">{item.label}</span>
+          {item.shortcut && <MenubarShortcut>{item.shortcut}</MenubarShortcut>}
         </MenubarCheckboxItem>
       );
     }

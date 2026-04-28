@@ -1,8 +1,17 @@
-import { memo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdErrorOutline } from "react-icons/md";
 import ResizeHandle from "@/components/layout/ResizeHandle";
 import { Button } from "@/components/ui/button";
+import { useApp } from "@/context/AppContext";
+import {
+  getActiveGroupForSession,
+  getSyncPeers,
+  isSessionPausedInGroup,
+  pauseSessionInGroup,
+  removeSessionFromGroup,
+  resumeSessionInGroup,
+} from "@/lib/syncInputGroups";
 import { isSplitPane } from "@/lib/workspaceTabs";
 import type { PaneNode, SplitPane, Tab } from "@/types/global";
 import XTerminal from "./XTerminal";
@@ -108,6 +117,7 @@ function PaneNodeView({
   onReconnected?: (oldSessionId: string, newSessionId: string) => void;
 }) {
   const { t } = useTranslation();
+  const { syncGroups, broadcastToAll } = useApp();
   const [isReconnectPending, setIsReconnectPending] = useState(false);
 
   const handleReconnectClick = async () => {
@@ -233,15 +243,120 @@ function PaneNodeView({
           ) : null}
         </div>
       ) : (
-        <XTerminal
+        <PaneXTerminal
           sessionId={node.sessionId}
           active={isActive}
           visible={visible}
           connectionId={node.connectionId}
           onReconnected={onReconnected}
+          syncGroups={syncGroups}
+          broadcastToAll={broadcastToAll}
         />
       )}
     </div>
+  );
+}
+
+function PaneXTerminal({
+  sessionId,
+  active,
+  visible,
+  connectionId,
+  onReconnected,
+  syncGroups,
+  broadcastToAll,
+}: {
+  sessionId: string;
+  active: boolean;
+  visible: boolean;
+  connectionId?: string;
+  onReconnected?: (oldSessionId: string, newSessionId: string) => void;
+  syncGroups: import("@/types/global").SyncGroup[];
+  broadcastToAll: boolean;
+}) {
+  const { tabs, setSyncGroups } = useApp();
+
+  const syncPeerSessionIds = useMemo(() => {
+    const peers = getSyncPeers(sessionId, syncGroups);
+    if (!broadcastToAll) return peers;
+
+    const allSessionIds = new Set(peers);
+    for (const tab of tabs) {
+      const panes = (function collect(n: import("@/types/global").PaneNode): import("@/types/global").SessionPane[] {
+        if (n.kind === "leaf") return [n];
+        return [...collect(n.first), ...collect(n.second)];
+      })(tab.root);
+      for (const p of panes) {
+        if (p.sessionId !== sessionId && !p.connecting && !p.connectError) {
+          allSessionIds.add(p.sessionId);
+        }
+      }
+    }
+    return [...allSessionIds];
+  }, [sessionId, syncGroups, broadcastToAll, tabs]);
+
+  const activeGroup = useMemo(
+    () => getActiveGroupForSession(sessionId, syncGroups),
+    [sessionId, syncGroups],
+  );
+
+  const isPaused = useMemo(
+    () => (activeGroup ? isSessionPausedInGroup(activeGroup, sessionId) : false),
+    [activeGroup, sessionId],
+  );
+
+  const handlePauseResume = useCallback(() => {
+    if (!activeGroup) return;
+    setSyncGroups((prev) =>
+      prev.map((g) =>
+        g.id === activeGroup.id
+          ? (isPaused ? resumeSessionInGroup(g, sessionId) : pauseSessionInGroup(g, sessionId))
+          : g,
+      ),
+    );
+  }, [activeGroup, isPaused, sessionId, setSyncGroups]);
+
+  const handleLeaveGroup = useCallback(() => {
+    if (!activeGroup) return;
+    setSyncGroups((prev) =>
+      prev.map((g) =>
+        g.id === activeGroup.id ? removeSessionFromGroup(g, sessionId) : g,
+      ),
+    );
+  }, [activeGroup, sessionId, setSyncGroups]);
+
+  const handleCloseGroup = useCallback(() => {
+    if (!activeGroup) return;
+    setSyncGroups((prev) =>
+      prev.map((g) =>
+        g.id === activeGroup.id ? { ...g, enabled: false } : g,
+      ),
+    );
+  }, [activeGroup, setSyncGroups]);
+
+  const syncOverlay = useMemo(() => {
+    if (!activeGroup?.enabled) return undefined;
+    return {
+      peerCount: syncPeerSessionIds.length,
+      isPaused,
+      groupColor: activeGroup.color,
+      groupName: activeGroup.name,
+      onPauseResume: handlePauseResume,
+      onLeaveGroup: handleLeaveGroup,
+      onCloseGroup: handleCloseGroup,
+    };
+  }, [activeGroup, syncPeerSessionIds.length, isPaused, handlePauseResume, handleLeaveGroup, handleCloseGroup]);
+
+  return (
+    <XTerminal
+      sessionId={sessionId}
+      active={active}
+      visible={visible}
+      connectionId={connectionId}
+      onReconnected={onReconnected}
+      syncPeerSessionIds={syncPeerSessionIds}
+      syncOverlay={syncOverlay}
+    />
   );
 }
 

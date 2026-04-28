@@ -21,6 +21,7 @@ import {
 import { PiRecordFill } from "react-icons/pi";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import SyncGroupDialog from "./components/dialog/terminal/SyncGroupDialog";
 import AboutDialog from "./components/dialog/app/AboutDialog";
 import LockScreen from "./components/dialog/app/LockScreen";
 import QuitConfirmDialog from "./components/dialog/app/QuitConfirmDialog";
@@ -66,6 +67,8 @@ import {
   type TerminalWindowNode,
   updateTerminalWindowSplitRatio,
 } from "./lib/tabWindows";
+import { buildSmartSplitLayout, type SmartSplitMode } from "./lib/smartSplit";
+import { purgeSessionFromGroups } from "./lib/syncInputGroups";
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   decreaseTerminalFontSize,
@@ -187,6 +190,9 @@ function App() {
     appSettings,
     closeTabs,
     savedConnections,
+    setSyncGroups,
+    broadcastToAll,
+    setBroadcastToAll,
     isLocked,
     setIsLocked,
     settingsLoaded,
@@ -212,6 +218,7 @@ function App() {
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [showSyncGroupDialog, setShowSyncGroupDialog] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [helpDotVisible, setHelpDotVisible] = useState(false);
@@ -677,6 +684,7 @@ function App() {
       try {
         await invoke("close_session", { sessionId: pane.sessionId });
         clearSessionCommandHistory(pane.sessionId);
+        setSyncGroups((prev) => purgeSessionFromGroups(pane.sessionId, prev));
         return true;
       } catch (error) {
         logger.error({
@@ -765,6 +773,22 @@ function App() {
       }
     },
     [activePane],
+  );
+
+  const handleSendToAllSessions = useCallback(
+    (command: string) => {
+      for (const tab of tabs) {
+        for (const pane of collectSessionPanes(tab.root)) {
+          if (!hasLiveSession(pane) || pane.type !== "SSH") continue;
+          const { sessionId } = pane;
+          void sendSessionInput(sessionId, `${command}\r`, {
+            preview: { kind: "reset" },
+            registerSubmission: command,
+          }).catch(() => {});
+        }
+      }
+    },
+    [tabs],
   );
 
   const handleReconnected = useCallback(
@@ -1166,6 +1190,20 @@ function App() {
     ],
   );
 
+  const handleSmartSplit = useCallback(
+    (mode: SmartSplitMode) => {
+      const tabIds = tabs.map((tab) => tab.id);
+      if (tabIds.length === 0) return;
+
+      const layout = buildSmartSplitLayout(tabIds, mode);
+      if (layout) {
+        setTerminalWindows(layout);
+        window.dispatchEvent(new CustomEvent("dragonfly:refresh-terminals"));
+      }
+    },
+    [tabs],
+  );
+
   const handleReconnectPane = useCallback(
     async (tabId: string, paneId: string) => {
       const tab = tabs.find((item) => item.id === tabId);
@@ -1370,6 +1408,8 @@ function App() {
     onResetZoom: handleResetZoom,
     onOpenSettings: handleOpenSettings,
     onLockScreen: handleLockScreen,
+    onManageSyncGroups: () => setShowSyncGroupDialog(true),
+    onClearTerminal: () => window.dispatchEvent(new CustomEvent("dragonfly:clear-terminal")),
   });
 
   // Recording toggle
@@ -1782,6 +1822,12 @@ function App() {
           onHelpMenuOpen={() => setHelpDotVisible(false)}
           activeTab={activeTab}
           savedConnections={savedConnections}
+          onSmartSplit={handleSmartSplit}
+          onManageSyncGroups={() => setShowSyncGroupDialog(true)}
+          onBroadcastToAll={() => setBroadcastToAll((prev) => !prev)}
+          broadcastToAll={broadcastToAll}
+          onClearTerminal={() => window.dispatchEvent(new CustomEvent("dragonfly:clear-terminal"))}
+          onResetTerminalSize={() => window.dispatchEvent(new CustomEvent("dragonfly:refresh-terminals"))}
         />
 
         {/* Main Content */}
@@ -1914,7 +1960,7 @@ function App() {
                   style={{ height: uiConfig.quick_cmd_height }}
                   className="shrink-0 overflow-hidden"
                 >
-                  <QuickCommands onSend={handleHistoryCommand} />
+                  <QuickCommands onSend={handleHistoryCommand} onSendToAll={handleSendToAllSessions} />
                 </div>
               </>
             )}
@@ -1995,6 +2041,11 @@ function App() {
         </main>
 
         <AboutDialog open={showAbout} onClose={() => setShowAbout(false)} />
+
+        <SyncGroupDialog
+          open={showSyncGroupDialog}
+          onClose={() => setShowSyncGroupDialog(false)}
+        />
 
         <UpdateDialog
           open={showUpdateDialog}

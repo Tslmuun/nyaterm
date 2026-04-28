@@ -16,6 +16,8 @@ export interface ShortcutCallbacks {
   onResetZoom: () => void;
   onOpenSettings: () => void;
   onLockScreen: () => void;
+  onManageSyncGroups: () => void;
+  onClearTerminal: () => void;
 }
 
 export function useGlobalShortcuts(cb: ShortcutCallbacks) {
@@ -43,6 +45,10 @@ export function useGlobalShortcuts(cb: ShortcutCallbacks) {
   useHotkeys("ctrl+-, meta+-", cb.onZoomOut, HOTKEY_OPTIONS);
   useHotkeys("ctrl+0, meta+0", cb.onResetZoom, HOTKEY_OPTIONS);
   useHotkeys("ctrl+comma, meta+comma", cb.onOpenSettings, HOTKEY_OPTIONS);
+
+  // --- Terminal ---
+  useHotkeys("ctrl+shift+g, meta+shift+g", cb.onManageSyncGroups, HOTKEY_OPTIONS);
+  useHotkeys("ctrl+shift+k, meta+shift+k", cb.onClearTerminal, HOTKEY_OPTIONS);
 
   // --- Special ---
   useHotkeys("ctrl+shift+l, meta+shift+l", cb.onLockScreen, HOTKEY_OPTIONS);

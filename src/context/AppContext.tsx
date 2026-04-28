@@ -38,6 +38,7 @@ import type {
   SavedConnection,
   SessionPane,
   SessionType,
+  SyncGroup,
   Tab,
   UiConfig,
 } from "@/types/global";
@@ -124,6 +125,12 @@ interface AppContextType {
   setEditingConnection: (conn: SavedConnection | undefined) => void;
   showSettingsDialog: boolean;
   setShowSettingsDialog: (show: boolean) => void;
+
+  // Sync Input Groups
+  syncGroups: SyncGroup[];
+  setSyncGroups: (groups: SyncGroup[] | ((prev: SyncGroup[]) => SyncGroup[])) => void;
+  broadcastToAll: boolean;
+  setBroadcastToAll: (value: boolean | ((prev: boolean) => boolean)) => void;
 
   // Idle Lock
   isLocked: boolean;
@@ -385,6 +392,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     undefined,
   );
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+
+  // Sync Input Groups
+  const [syncGroups, setSyncGroups] = useState<SyncGroup[]>([]);
+  const [broadcastToAll, setBroadcastToAll] = useState(false);
 
   // Idle Lock State
   const [isLocked, setIsLocked] = useState(false);
@@ -1011,6 +1022,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setEditingConnection,
       showSettingsDialog,
       setShowSettingsDialog,
+      syncGroups,
+      setSyncGroups,
+      broadcastToAll,
+      setBroadcastToAll,
       isLocked,
       setIsLocked,
       settingsLoaded,
@@ -1045,6 +1060,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showNewSession,
       editingConnection,
       showSettingsDialog,
+      syncGroups,
+      broadcastToAll,
       isLocked,
       settingsLoaded,
     ],

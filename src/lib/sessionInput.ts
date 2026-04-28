@@ -145,3 +145,22 @@ export async function sendSessionInput(
     });
   }
 }
+
+/**
+ * Send input to a session and broadcast to all sync-group peers.
+ * Peers receive raw `write_to_session` only (no preview / history registration).
+ */
+export async function sendSessionInputWithSync(
+  sessionId: string,
+  data: string,
+  peerSessionIds: string[],
+  options: SendSessionInputOptions = {},
+): Promise<void> {
+  await sendSessionInput(sessionId, data, options);
+
+  if (peerSessionIds.length > 0) {
+    await Promise.allSettled(
+      peerSessionIds.map((sid) => invoke("write_to_session", { sessionId: sid, data })),
+    );
+  }
+}

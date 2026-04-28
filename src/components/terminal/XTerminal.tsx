@@ -6,6 +6,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { type ILinkHandler, Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MdCellTower, MdClose, MdLogout, MdPause, MdPlayArrow } from "react-icons/md";
 import { useTerminalAppSettings } from "@/context/AppContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useActionLinks } from "@/hooks/useActionLinks";
@@ -22,6 +23,7 @@ import {
   listenSessionInputPreview,
   type SessionInputPreview,
   sendSessionInput,
+  sendSessionInputWithSync,
 } from "@/lib/sessionInput";
 import {
   applyTerminalInputData,
@@ -39,16 +41,71 @@ import TerminalGutter from "./TerminalGutter";
 import TerminalSearchBar from "./TerminalSearchBar";
 import "@xterm/xterm/css/xterm.css";
 
+interface SyncOverlayState {
+  peerCount: number;
+  isPaused: boolean;
+  groupColor?: string;
+  groupName?: string;
+  onPauseResume: () => void;
+  onLeaveGroup: () => void;
+  onCloseGroup: () => void;
+}
+
 interface XTerminalProps {
   sessionId: string;
   active: boolean;
   visible?: boolean;
   connectionId?: string;
   onReconnected?: (oldSessionId: string, newSessionId: string) => void;
+  syncPeerSessionIds?: string[];
+  syncOverlay?: SyncOverlayState;
 }
 
 type PerformanceMode = "normal" | "overloaded";
 type PerformanceOverlayState = "overloaded" | "recovered" | null;
+
+function SyncActionOverlay({ overlay }: { overlay: SyncOverlayState }) {
+  const { t } = useTranslation();
+  const color = overlay.groupColor ?? "var(--df-primary)";
+
+  return (
+    <div className="absolute right-2 top-1 z-20 flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] shadow-sm" style={{ backgroundColor: "color-mix(in srgb, var(--df-bg-panel) 92%, transparent)", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)` }}>
+      <MdCellTower className="text-xs mr-0.5" style={{ color }} />
+      <span className="font-medium mr-1" style={{ color }}>
+        {overlay.isPaused ? t("syncGroup.paused") : t("syncGroup.broadcastActive")}
+      </span>
+      <button
+        type="button"
+        className="flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors hover:bg-white/10"
+        style={{ color }}
+        onClick={overlay.onPauseResume}
+        title={overlay.isPaused ? t("syncGroup.resumeSync") : t("syncGroup.pauseSync")}
+      >
+        {overlay.isPaused ? <MdPlayArrow className="text-xs" /> : <MdPause className="text-xs" />}
+        <span>{overlay.isPaused ? t("syncGroup.resumeSync") : t("syncGroup.pauseSync")}</span>
+      </button>
+      <button
+        type="button"
+        className="flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors hover:bg-white/10"
+        style={{ color }}
+        onClick={overlay.onLeaveGroup}
+        title={t("syncGroup.leaveGroup")}
+      >
+        <MdLogout className="text-xs" />
+        <span>{t("syncGroup.leaveGroup")}</span>
+      </button>
+      <button
+        type="button"
+        className="flex items-center gap-0.5 rounded px-1 py-0.5 text-red-400 transition-colors hover:bg-red-500/10"
+        onClick={overlay.onCloseGroup}
+        title={t("syncGroup.closeGroup")}
+      >
+        <MdClose className="text-xs" />
+        <span>{t("syncGroup.closeGroup")}</span>
+      </button>
+    </div>
+  );
+}
 
 /**
  * xterm.js terminal for a session. Handles OSC 133 shell integration (or fallback prompt
@@ -60,6 +117,8 @@ export default function XTerminal({
   visible = true,
   connectionId,
   onReconnected,
+  syncPeerSessionIds,
+  syncOverlay,
 }: XTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -93,6 +152,7 @@ export default function XTerminal({
   const connectionIdRef = useRef(connectionId);
   const onReconnectedRef = useRef(onReconnected);
   const sessionIdRef = useRef(sessionId);
+  const syncPeerSessionIdsRef = useRef(syncPeerSessionIds);
   const visibleRef = useRef(visible);
   const performanceModeRef = useRef<PerformanceMode>("normal");
   const performanceOverlayTimerRef = useRef<number | null>(null);
@@ -109,6 +169,10 @@ export default function XTerminal({
   useEffect(() => {
     onReconnectedRef.current = onReconnected;
   }, [onReconnected]);
+
+  useEffect(() => {
+    syncPeerSessionIdsRef.current = syncPeerSessionIds;
+  }, [syncPeerSessionIds]);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -873,10 +937,18 @@ export default function XTerminal({
       inputStateRef.current = applyTerminalInputData(inputStateRef.current, data);
       syncSuggestionsWithInputState();
 
-      void sendSessionInput(sessionId, data, {
-        preview: null,
-        registerSubmission: data === "\r" && command ? command : null,
-      }).catch(() => {});
+      const peers = syncPeerSessionIdsRef.current;
+      if (peers && peers.length > 0) {
+        void sendSessionInputWithSync(sessionId, data, peers, {
+          preview: null,
+          registerSubmission: data === "\r" && command ? command : null,
+        }).catch(() => {});
+      } else {
+        void sendSessionInput(sessionId, data, {
+          preview: null,
+          registerSubmission: data === "\r" && command ? command : null,
+        }).catch(() => {});
+      }
     });
 
     const resizeDisposable = terminal.onResize(({ cols, rows }) => {
@@ -1063,6 +1135,18 @@ export default function XTerminal({
     };
   }, [active, visible]);
 
+  useEffect(() => {
+    const handleClear = () => {
+      if (!active || !terminalRef.current) return;
+      terminalRef.current.clear();
+    };
+
+    window.addEventListener("dragonfly:clear-terminal", handleClear);
+    return () => {
+      window.removeEventListener("dragonfly:clear-terminal", handleClear);
+    };
+  }, [active]);
+
   const doFind = useCallback(
     (selection?: string) => {
       if (selection) {
@@ -1121,6 +1205,10 @@ export default function XTerminal({
               </div>
             </div>
           </div>
+        )}
+
+        {syncOverlay && (
+          <SyncActionOverlay overlay={syncOverlay} />
         )}
 
         <TerminalSearchBar

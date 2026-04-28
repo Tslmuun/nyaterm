@@ -1,6 +1,7 @@
-import { type DragEvent, memo, useCallback, useState } from "react";
+import { type DragEvent, memo, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MdAdd, MdClose, MdDns, MdErrorOutline, MdTerminal } from "react-icons/md";
+import { MdAdd, MdCellTower, MdClose, MdDns, MdErrorOutline, MdTerminal } from "react-icons/md";
+import { getActiveGroupForSession, isSessionPausedInGroup } from "@/lib/syncInputGroups";
 import { getActivePane, getTabDisplayName } from "@/lib/workspaceTabs";
 import type { PaneSplitDirection, Tab } from "@/types/global";
 import { useApp } from "../../context/AppContext";
@@ -26,6 +27,42 @@ interface TabBarProps {
   onReorderTabs: (fromTabId: string, toIndex: number) => void;
 }
 
+function SyncIndicator({
+  tab,
+  syncGroups,
+  broadcastToAll,
+}: {
+  tab: Tab;
+  syncGroups: import("@/types/global").SyncGroup[];
+  broadcastToAll: boolean;
+}) {
+  const pane = getActivePane(tab);
+  const sessionId = pane?.sessionId;
+
+  const activeGroup = useMemo(() => {
+    if (!sessionId || pane?.connecting || pane?.connectError) return null;
+    if (broadcastToAll) return null;
+    return getActiveGroupForSession(sessionId, syncGroups);
+  }, [sessionId, syncGroups, broadcastToAll, pane?.connecting, pane?.connectError]);
+
+  const isMember = broadcastToAll || !!activeGroup;
+  const isPaused = activeGroup && sessionId
+    ? isSessionPausedInGroup(activeGroup, sessionId)
+    : false;
+
+  if (!isMember) return null;
+
+  return (
+    <MdCellTower
+      className="text-[11px] shrink-0"
+      style={{
+        color: activeGroup?.color ?? "var(--df-primary)",
+        opacity: isPaused ? 0.4 : 1,
+      }}
+    />
+  );
+}
+
 /** Tab strip for workspace tabs. Drag-reorder is runtime-only. */
 function TabBar({
   tabs,
@@ -46,7 +83,7 @@ function TabBar({
   onReorderTabs,
 }: TabBarProps) {
   const { t } = useTranslation();
-  const { savedConnections } = useApp();
+  const { savedConnections, syncGroups, broadcastToAll } = useApp();
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -233,6 +270,8 @@ function TabBar({
                 {renderTabIcon(tab)}
 
                 <span className="max-w-[160px] truncate whitespace-nowrap">{displayName}</span>
+
+                <SyncIndicator tab={tab} syncGroups={syncGroups} broadcastToAll={broadcastToAll} />
 
                 <div className="relative ml-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center">
                   {showUnreadIndicator ? (
