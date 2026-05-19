@@ -105,7 +105,7 @@ export default function ConnectionItem({ conn, indented, depth = 0 }: Connection
               {conn.name}
             </span>
             <div
-              className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover/item:flex items-center gap-0.5 shrink-0 backdrop-blur-sm rounded px-1"
+              className="pointer-events-none sticky right-2 z-10 -ml-16 flex shrink-0 items-center gap-0.5 rounded px-1 opacity-0 backdrop-blur-sm transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100"
               style={{ backgroundColor: "var(--df-bg-hover)" }}
             >
               <button
