@@ -186,7 +186,10 @@ export default function PropertiesDialog({ data, onClose }: PropertiesDialogProp
             {data.is_dir ? (
               <MdFolder className="text-lg shrink-0" style={{ color: "#eab308" }} />
             ) : (
-              <MdInsertDriveFile className="text-lg shrink-0" style={{ color: "var(--df-primary)" }} />
+              <MdInsertDriveFile
+                className="text-lg shrink-0"
+                style={{ color: "var(--df-primary)" }}
+              />
             )}
             <span className="truncate" title={t("fileExplorer.propertiesOf", { name: data.name })}>
               {t("fileExplorer.propertiesOf", { name: data.name })}
@@ -222,10 +225,7 @@ export default function PropertiesDialog({ data, onClose }: PropertiesDialogProp
                       key: "location",
                       label: t("fileExplorer.location"),
                       value: (
-                        <span
-                          className="break-all select-all font-mono"
-                          title={getLocation()}
-                        >
+                        <span className="break-all select-all font-mono" title={getLocation()}>
                           {getLocation()}
                         </span>
                       ),

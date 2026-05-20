@@ -14,12 +14,11 @@ import { useCommandHistory } from "@/hooks/useCommandHistory";
 import { useCredentialAutofill } from "@/hooks/useCredentialAutofill";
 import { useKeywordHighlighter } from "@/hooks/useKeywordHighlighter";
 import { useShellIntegration } from "@/hooks/useShellIntegration";
+import { resolveShortcutKeys } from "@/hooks/useShortcutMap";
 import { useTerminalSearch } from "@/hooks/useTerminalSearch";
 import { useTerminalSettings } from "@/hooks/useTerminalSettings";
 import { emitAIErrorDetected } from "@/lib/aiEvents";
-import { renderAiCommandStart, renderAiCommandEnd } from "@/lib/aiTerminalRenderer";
-import type { AiCaptureEvent } from "@/types/global";
-import { resolveShortcutKeys } from "@/hooks/useShortcutMap";
+import { renderAiCommandEnd, renderAiCommandStart } from "@/lib/aiTerminalRenderer";
 import { readClipboardText } from "@/lib/clipboard";
 import { invoke } from "@/lib/invoke";
 import { hexLuminance } from "@/lib/keywordHighlightPresets";
@@ -30,6 +29,7 @@ import {
   sendSessionInput,
   sendSessionInputWithSync,
 } from "@/lib/sessionInput";
+import { matchesKeyEvent } from "@/lib/shortcutRegistry";
 import { registerTerminalContextProvider } from "@/lib/terminalContext";
 import {
   applyTerminalInputData,
@@ -39,8 +39,8 @@ import {
   getTrackedSubmissionCommand,
   resyncFromTerminalLine,
 } from "@/lib/terminalInputTracker";
-import { matchesKeyEvent } from "@/lib/shortcutRegistry";
 import { XTERM_PERFORMANCE_CONFIG } from "@/lib/xtermPerformance";
+import type { AiCaptureEvent } from "@/types/global";
 import ActionLinkMenu from "./ActionLinkMenu";
 import ActionLinkTooltip from "./ActionLinkTooltip";
 import CommandSuggestions from "./CommandSuggestions";
@@ -750,11 +750,7 @@ export default function XTerminal({
       ];
       for (const sid of swallowIds) {
         if (sid === "tab.switchTo") {
-          if (
-            (e.ctrlKey || e.metaKey) &&
-            !e.shiftKey &&
-            /^Digit[1-9]$/.test(e.code)
-          ) {
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
             return false;
           }
           continue;
@@ -1079,20 +1075,23 @@ export default function XTerminal({
       }
       focusUnlisten = nextFocusUnlisten;
 
-      const nextCaptureUnlisten = await listen<AiCaptureEvent>(`ai-capture-${sessionId}`, (event) => {
-        const payload = event.payload;
-        if (payload.type === "commandStart") {
-          aiCapturingRef.current = true;
-          if (isTerminalAlive()) {
-            terminal.write(renderAiCommandStart(payload));
+      const nextCaptureUnlisten = await listen<AiCaptureEvent>(
+        `ai-capture-${sessionId}`,
+        (event) => {
+          const payload = event.payload;
+          if (payload.type === "commandStart") {
+            aiCapturingRef.current = true;
+            if (isTerminalAlive()) {
+              terminal.write(renderAiCommandStart(payload));
+            }
+          } else if (payload.type === "commandEnd") {
+            aiCapturingRef.current = false;
+            if (isTerminalAlive()) {
+              terminal.write(renderAiCommandEnd(payload));
+            }
           }
-        } else if (payload.type === "commandEnd") {
-          aiCapturingRef.current = false;
-          if (isTerminalAlive()) {
-            terminal.write(renderAiCommandEnd(payload));
-          }
-        }
-      });
+        },
+      );
       if (disposed) {
         nextCaptureUnlisten();
         return;
@@ -1504,7 +1503,6 @@ export default function XTerminal({
         )}
 
         {syncOverlay && <SyncActionOverlay overlay={syncOverlay} />}
-
 
         <TerminalSearchBar
           show={showSearchBar}

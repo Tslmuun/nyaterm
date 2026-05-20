@@ -374,9 +374,7 @@ export function PasswordManagementTab({
                             </Button>
                           </span>
                         </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {lockedHint ?? t("common.edit")}
-                        </TooltipContent>
+                        <TooltipContent side="top">{lockedHint ?? t("common.edit")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

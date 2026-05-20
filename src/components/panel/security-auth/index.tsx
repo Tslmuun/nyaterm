@@ -58,7 +58,7 @@ export default function SecurityAuthPanel() {
               <TabsTrigger value="otp" className="text-xs">
                 {t("securityAuth.otp")}
               </TabsTrigger>
-                <TabsTrigger value="credentials" className="text-xs">
+              <TabsTrigger value="credentials" className="text-xs">
                 {t("securityAuth.credentials")}
               </TabsTrigger>
             </TabsList>

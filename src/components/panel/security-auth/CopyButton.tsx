@@ -28,11 +28,7 @@ export function CopyButton({ value }: CopyButtonProps) {
           onClick={handleCopy}
           aria-label={copied ? t("common.copied") : t("common.copyToClipboard")}
         >
-          {copied ? (
-            <Check className="h-3 w-3 text-emerald-500" />
-          ) : (
-            <Copy className="h-3 w-3" />
-          )}
+          {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
         </button>
       </TooltipTrigger>
       <TooltipContent side="top">

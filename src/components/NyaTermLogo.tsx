@@ -23,39 +23,18 @@ export default function NyaTermLogo({ className, ...props }: NyaTermLogoProps) {
 
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop
-            offset="0%"
-            stopColor="var(--grad-from, var(--df-primary, #06b6d4))"
-          />
-          <stop
-            offset="100%"
-            stopColor="var(--grad-to, var(--df-primary-hover, #2563eb))"
-          />
+          <stop offset="0%" stopColor="var(--grad-from, var(--df-primary, #06b6d4))" />
+          <stop offset="100%" stopColor="var(--grad-to, var(--df-primary-hover, #2563eb))" />
         </linearGradient>
 
-        <mask
-          id={maskId}
-          maskUnits="userSpaceOnUse"
-          x="0"
-          y="0"
-          width="1024"
-          height="1024"
-        >
+        <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
           <rect x="0" y="0" width="1024" height="1024" fill="white" />
           <circle cx="420" cy="558" r="44" fill="black" />
           <circle cx="604" cy="558" r="44" fill="black" />
         </mask>
       </defs>
 
-      <rect
-        x="0"
-        y="0"
-        width="1024"
-        height="1024"
-        rx="192"
-        ry="192"
-        fill={`url(#${gradientId})`}
-      />
+      <rect x="0" y="0" width="1024" height="1024" rx="192" ry="192" fill={`url(#${gradientId})`} />
 
       <path
         fill="#FFFFFF"

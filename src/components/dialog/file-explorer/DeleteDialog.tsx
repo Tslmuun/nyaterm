@@ -80,9 +80,7 @@ export default function DeleteDialog({ data, onClose, onSuccess }: DeleteDialogP
               ? t("fileExplorer.sureDelete", { name: data.items[0]?.name ?? "" })
               : t("fileExplorer.sureDeleteMultiple", { count: data.items.length })}
           </DialogTitle>
-          <DialogDescription className="sr-only">
-            {t("fileExplorer.cmDelete")}
-          </DialogDescription>
+          <DialogDescription className="sr-only">{t("fileExplorer.cmDelete")}</DialogDescription>
         </DialogHeader>
 
         {data.items.length > 1 && (

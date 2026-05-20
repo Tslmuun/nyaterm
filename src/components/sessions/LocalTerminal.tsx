@@ -72,10 +72,7 @@ export function LocalTerminal({
         </div>
       </div>
       <div className="flex flex-wrap gap-3">
-        <AiExecutionProfileField
-          value={aiExecutionProfile}
-          onChange={setAiExecutionProfile}
-        />
+        <AiExecutionProfileField value={aiExecutionProfile} onChange={setAiExecutionProfile} />
       </div>
       <div>
         <Label className="text-[0.6875rem] text-muted-foreground">

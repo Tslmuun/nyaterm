@@ -69,7 +69,9 @@ export default function VariablePromptDialog({
       <DialogContent className="w-[400px] sm:max-w-[400px] p-0 gap-0">
         <DialogHeader className="px-5 py-3 border-b">
           <DialogTitle className="text-sm">{t("quickCommands.fillVariables")}</DialogTitle>
-          <DialogDescription className="sr-only">{t("quickCommands.fillVariables")}</DialogDescription>
+          <DialogDescription className="sr-only">
+            {t("quickCommands.fillVariables")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">

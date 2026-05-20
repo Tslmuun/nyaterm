@@ -76,11 +76,7 @@ import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/context/ThemeContext";
 import type { AIErrorDetectedDetail, AIOpenIntent } from "@/lib/aiEvents";
 import { AI_ERROR_DETECTED_EVENT } from "@/lib/aiEvents";
-import {
-  getEnabledAIModels,
-  getModelProviderLabel,
-  selectDefaultAIModel,
-} from "@/lib/aiSettings";
+import { getEnabledAIModels, getModelProviderLabel, selectDefaultAIModel } from "@/lib/aiSettings";
 import { getErrorMessage } from "@/lib/errors";
 import { invoke } from "@/lib/invoke";
 import { buildAIContext, getTerminalContextProvider } from "@/lib/terminalContext";
@@ -111,12 +107,7 @@ interface AIAssistantPanelProps {
   intent: AIOpenIntent | null;
 }
 
-type AICommandExecutionStatus =
-  | "idle"
-  | "executed"
-  | "pending_approval"
-  | "rejected"
-  | "failed";
+type AICommandExecutionStatus = "idle" | "executed" | "pending_approval" | "rejected" | "failed";
 
 interface AICommandExecutionState {
   status: AICommandExecutionStatus;
@@ -1740,15 +1731,21 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
                       <MdErrorOutline className="text-2xl text-amber-500" />
                     </div>
                     <div className="space-y-1">
-                      <div className="text-sm font-medium text-foreground">{t("ai.setupTitle")}</div>
+                      <div className="text-sm font-medium text-foreground">
+                        {t("ai.setupTitle")}
+                      </div>
                     </div>
                     <div className="w-full space-y-2 text-left text-xs">
                       <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.625rem] font-bold text-primary">1</span>
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.625rem] font-bold text-primary">
+                          1
+                        </span>
                         <span>{t("ai.setupStep1")}</span>
                       </div>
                       <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.625rem] font-bold text-primary">2</span>
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.625rem] font-bold text-primary">
+                          2
+                        </span>
                         <span>{t("ai.setupStep2")}</span>
                       </div>
                     </div>

@@ -109,9 +109,7 @@ const BUILTIN_PATTERNS = {
   duration: [
     "\\b[-+]?\\d+(?:\\.\\d+)?\\s*(?:ns|µs|us|ms|sec|mins?|minutes|hrs?|hours|days|weeks|months|years)\\b",
   ],
-  prompt: [
-    "[$#](?=\\s)",
-  ],
+  prompt: ["[$#](?=\\s)"],
 } as const;
 
 // ── Color sets ───────────────────────────────────────────────────────────────

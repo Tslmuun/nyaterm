@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
-  type ShortcutCategory,
-  type ShortcutDefinition,
-  SHORTCUT_REGISTRY,
   formatKeysForDisplay,
   resolveKeys,
+  SHORTCUT_REGISTRY,
+  type ShortcutCategory,
+  type ShortcutDefinition,
 } from "@/lib/shortcutRegistry";
 
 export interface ResolvedShortcut {
@@ -61,29 +61,21 @@ export function useShortcutMap() {
  * Standalone (non-hook) function to resolve shortcuts from a keybindings map.
  * Used in contexts where React hooks are not available (e.g. xterm key handlers).
  */
-export function resolveShortcutKeys(
-  id: string,
-  overrides: Record<string, string>,
-): string {
+export function resolveShortcutKeys(id: string, overrides: Record<string, string>): string {
   return resolveKeys(id, overrides);
 }
 
 /**
  * Standalone function to resolve display keys for menus and labels.
  */
-export function resolveDisplayKeys(
-  id: string,
-  overrides: Record<string, string>,
-): string {
+export function resolveDisplayKeys(id: string, overrides: Record<string, string>): string {
   return formatKeysForDisplay(resolveKeys(id, overrides));
 }
 
 /**
  * Get all shortcut definitions with resolved keys, without requiring React hooks.
  */
-export function resolveAllShortcuts(
-  overrides: Record<string, string>,
-): ResolvedShortcut[] {
+export function resolveAllShortcuts(overrides: Record<string, string>): ResolvedShortcut[] {
   return SHORTCUT_REGISTRY.map((def: ShortcutDefinition) => {
     const keys = resolveKeys(def.id, overrides);
     return {

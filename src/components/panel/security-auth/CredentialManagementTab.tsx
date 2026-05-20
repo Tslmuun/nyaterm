@@ -429,9 +429,7 @@ export function CredentialManagementTab({
                         <span className="min-w-0 select-text break-all text-[0.6875rem] text-muted-foreground">
                           {entry.username}
                         </span>
-                        {entry.username ? (
-                          <CopyButton value={entry.username} />
-                        ) : null}
+                        {entry.username ? <CopyButton value={entry.username} /> : null}
                       </div>
                       {revealedIds.has(entry.id) ? (
                         <div className="mt-1 flex items-start gap-0.5">
@@ -494,9 +492,7 @@ export function CredentialManagementTab({
                             </Button>
                           </span>
                         </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {lockedHint ?? t("common.edit")}
-                        </TooltipContent>
+                        <TooltipContent side="top">{lockedHint ?? t("common.edit")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

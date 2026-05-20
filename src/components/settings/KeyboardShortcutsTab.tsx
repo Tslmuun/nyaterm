@@ -4,13 +4,13 @@ import { MdEdit, MdRefresh, MdSearch } from "react-icons/md";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useApp } from "@/context/AppContext";
 import {
+  formatKeysForDisplay,
+  keyEventToHotkeyString,
+  resolveKeys,
   SHORTCUT_CATEGORIES,
   SHORTCUT_REGISTRY,
   type ShortcutCategory,
   type ShortcutDefinition,
-  formatKeysForDisplay,
-  keyEventToHotkeyString,
-  resolveKeys,
 } from "@/lib/shortcutRegistry";
 import { SettingSection } from "./SettingFormItems";
 
@@ -79,7 +79,11 @@ export function KeyboardShortcutsTab() {
       if (lowerSearch) {
         const label = t(sc.labelKey).toLowerCase();
         const keys = sc.displayKeys.toLowerCase();
-        if (!label.includes(lowerSearch) && !keys.includes(lowerSearch) && !sc.id.toLowerCase().includes(lowerSearch)) {
+        if (
+          !label.includes(lowerSearch) &&
+          !keys.includes(lowerSearch) &&
+          !sc.id.toLowerCase().includes(lowerSearch)
+        ) {
           continue;
         }
       }
@@ -199,11 +203,7 @@ export function KeyboardShortcutsTab() {
         if (!items || items.length === 0) return null;
 
         return (
-          <SettingSection
-            key={cat.key}
-            title={t(cat.labelKey)}
-            contentClassName="space-y-0"
-          >
+          <SettingSection key={cat.key} title={t(cat.labelKey)} contentClassName="space-y-0">
             <div className="divide-y divide-border/40">
               {items.map((sc) => (
                 <ShortcutRow

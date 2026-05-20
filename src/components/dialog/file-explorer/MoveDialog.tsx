@@ -61,7 +61,10 @@ export default function MoveDialog({ data, onClose, onSuccess }: MoveDialogProps
     <Dialog open onOpenChange={(v) => !v && !isSubmitting && onClose()}>
       <DialogContent className="w-96 sm:max-w-96">
         <DialogHeader>
-          <DialogTitle className="text-sm truncate" title={t("fileExplorer.moveTo", { name: data.name })}>
+          <DialogTitle
+            className="text-sm truncate"
+            title={t("fileExplorer.moveTo", { name: data.name })}
+          >
             {t("fileExplorer.moveTo", { name: data.name })}
           </DialogTitle>
           <DialogDescription className="sr-only">

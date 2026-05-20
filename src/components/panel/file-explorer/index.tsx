@@ -997,8 +997,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
 
       setIsExternalDropActive(isActive);
       if (event.dataTransfer) {
-        event.dataTransfer.dropEffect =
-          event.type === "dragenter" || isActive ? "copy" : "none";
+        event.dataTransfer.dropEffect = event.type === "dragenter" || isActive ? "copy" : "none";
       }
     };
 
@@ -1154,8 +1153,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
         return;
       }
 
-      const remoteDir =
-        normalizeDirectoryPath(currentPathRef.current) || homeDirRef.current || "/";
+      const remoteDir = normalizeDirectoryPath(currentPathRef.current) || homeDirRef.current || "/";
       const target = { sessionId: currentSessionId, remoteDir };
       const dropPaths = event.payload.paths;
 
@@ -1217,8 +1215,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
         return;
       }
 
-      const remoteDir =
-        normalizeDirectoryPath(currentPathRef.current) || homeDirRef.current || "/";
+      const remoteDir = normalizeDirectoryPath(currentPathRef.current) || homeDirRef.current || "/";
       const target = { sessionId: currentSessionId, remoteDir };
 
       void processExternalDropPaths(target, payload.paths);

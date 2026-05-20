@@ -64,7 +64,10 @@ export default function RenameDialog({ data, onClose, onSuccess }: RenameDialogP
     <Dialog open onOpenChange={(v) => !v && !isSubmitting && onClose()}>
       <DialogContent className="w-80 sm:max-w-80">
         <DialogHeader>
-          <DialogTitle className="text-sm truncate" title={t("fileExplorer.renameTo", { name: data.name })}>
+          <DialogTitle
+            className="text-sm truncate"
+            title={t("fileExplorer.renameTo", { name: data.name })}
+          >
             {t("fileExplorer.renameTo", { name: data.name })}
           </DialogTitle>
           <DialogDescription className="sr-only">

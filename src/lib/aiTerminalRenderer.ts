@@ -7,7 +7,9 @@ const ACCENT = "\x1b[38;5;141m"; // purple/violet
 const GREEN = "\x1b[38;5;78m";
 const RED = "\x1b[38;5;203m";
 
-export function renderAiCommandStart(event: Extract<AiCaptureEvent, { type: "commandStart" }>): string {
+export function renderAiCommandStart(
+  event: Extract<AiCaptureEvent, { type: "commandStart" }>,
+): string {
   const step = event.stepIndex + 1;
   const header = `${DIM}${ACCENT}┌ AI #${step}${RESET}${DIM} ${"─".repeat(30)}${RESET}`;
   const cmd = `${DIM}${ACCENT}│${RESET} ${BOLD}$ ${event.command}${RESET}`;
