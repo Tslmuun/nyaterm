@@ -1,7 +1,9 @@
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MdAdd, MdClose } from "react-icons/md";
+import { MdAdd, MdClose, MdDeleteOutline, MdFolderOpen, MdImage } from "react-icons/md";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -10,13 +12,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
+import {
+  BACKGROUND_IMAGE_FITS,
+  buildBackgroundImageLayerStyle,
+  buildSurfaceCssVariables,
+  clampOpacity,
+  DEFAULT_BACKGROUND_CONTENT_OPACITY,
+  DEFAULT_BACKGROUND_IMAGE_FIT,
+  DEFAULT_BACKGROUND_IMAGE_OPACITY,
+  isBackgroundImageEnabled,
+  loadBackgroundImageDataUrl,
+  normalizeBackgroundImageFit,
+} from "@/lib/backgroundImage";
 import { invoke } from "@/lib/invoke";
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   MAX_TERMINAL_FONT_SIZE,
   MIN_TERMINAL_FONT_SIZE,
 } from "@/lib/terminalFontSize";
-import { themeList } from "@/lib/themes";
+import { DEFAULT_THEME_ID, themeList, themes } from "@/lib/themes";
+import type { AppearanceSettings } from "@/types/global";
 import {
   SettingFieldGrid,
   SettingNumberInput,
@@ -45,6 +60,7 @@ const PACKAGE_BUILT_IN_FONTS = new Set(PACKAGE_FONTS.map((font) => font.toLowerC
 const TERMINAL_BUILT_IN_FONTS = new Set(
   PACKAGE_FONT_INFOS.filter((font) => font.monospace).map((font) => font.family.toLowerCase()),
 );
+const BACKGROUND_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "bmp"];
 
 function splitFontStack(fontFamily: string) {
   return fontFamily
@@ -72,6 +88,278 @@ function previewFontFamily(font: string, fallback: "sans-serif" | "monospace") {
     return font;
   }
   return `"${font}", ${fallback}`;
+}
+
+function percentLabel(value: number | null | undefined) {
+  return `${Math.round(clampOpacity(value) * 100)}%`;
+}
+
+function PercentSlider({
+  label,
+  desc,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  desc?: string;
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const percent = Math.round(clampOpacity(value) * 100);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Label className="text-sm font-medium leading-5">{label}</Label>
+          {desc && <p className="mt-1 text-xs leading-5 text-muted-foreground">{desc}</p>}
+        </div>
+        <span className="shrink-0 rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono text-xs text-muted-foreground">
+          {percent}%
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={percent}
+        disabled={disabled}
+        className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+        onChange={(event) => onChange(Number(event.target.value) / 100)}
+      />
+    </div>
+  );
+}
+
+function BackgroundPreview({ appearance }: { appearance: AppearanceSettings }) {
+  const { t } = useTranslation();
+  const backgroundImagePath = appearance.background_image_path?.trim() ?? "";
+  const hasImage = Boolean(backgroundImagePath);
+  const [dataUrl, setDataUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setDataUrl("");
+    if (!backgroundImagePath) return;
+
+    void loadBackgroundImageDataUrl(backgroundImagePath).then((url) => {
+      if (!cancelled) setDataUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backgroundImagePath]);
+
+  const canShowImage = hasImage && Boolean(dataUrl);
+  const previewAppearance = canShowImage
+    ? appearance
+    : {
+        ...appearance,
+        background_image_path: null,
+      };
+  const previewTheme = themes[appearance.theme] || themes[DEFAULT_THEME_ID];
+  const previewSurfaceStyle = {
+    ...buildSurfaceCssVariables(previewTheme.colors, previewAppearance),
+    backgroundColor: previewTheme.colors.bg,
+    color: "var(--df-text)",
+  };
+
+  return (
+    <div
+      className="relative h-44 overflow-hidden rounded-lg border border-border/70 shadow-inner"
+      style={previewSurfaceStyle}
+    >
+      {canShowImage && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={buildBackgroundImageLayerStyle(appearance, dataUrl)}
+        />
+      )}
+      {!canShowImage && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--df-bg-terminal), var(--df-bg-panel) 55%, var(--df-bg-hover))",
+          }}
+        />
+      )}
+      <div className="relative z-10 flex h-full min-w-0 flex-col">
+        <div
+          className="flex h-8 shrink-0 items-center gap-2 border-b px-3"
+          style={{ backgroundColor: "var(--df-bg-panel)", borderColor: "var(--df-border)" }}
+        >
+          <div className="flex gap-1">
+            <span className="h-2 w-2 rounded-full bg-red-400/80" />
+            <span className="h-2 w-2 rounded-full bg-amber-400/80" />
+            <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+          </div>
+          <span className="truncate text-xs font-medium text-muted-foreground">NyaTerm</span>
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-[2.25rem_minmax(0,1fr)_8rem]">
+          <div
+            className="flex flex-col items-center gap-2 border-r py-3"
+            style={{ backgroundColor: "var(--df-bg)", borderColor: "var(--df-border)" }}
+          >
+            <span className="h-5 w-5 rounded-md bg-primary/80" />
+            <span className="h-5 w-5 rounded-md bg-muted-foreground/30" />
+            <span className="mt-auto h-5 w-5 rounded-md bg-muted-foreground/30" />
+          </div>
+          <div
+            className="min-w-0 p-3 font-mono text-[0.68rem] leading-5"
+            style={{ backgroundColor: "var(--df-bg-terminal)" }}
+          >
+            <div className="text-primary">$ ssh nyaterm.local</div>
+            <div>systemctl status nyaterm</div>
+            <div className="text-muted-foreground">● active · terminal workspace</div>
+            <div className="mt-2 h-2 w-4/5 rounded-full bg-primary/30" />
+            <div className="mt-2 h-2 w-2/3 rounded-full bg-muted-foreground/30" />
+          </div>
+          <div
+            className="hidden border-l p-3 sm:block"
+            style={{ backgroundColor: "var(--df-bg-panel)", borderColor: "var(--df-border)" }}
+          >
+            <div className="mb-3 text-[0.65rem] font-medium text-muted-foreground">
+              {t("settings.backgroundPreviewPanel")}
+            </div>
+            <div className="space-y-2">
+              <div className="h-2 rounded-full bg-primary/35" />
+              <div className="h-2 rounded-full bg-muted-foreground/25" />
+              <div className="h-2 w-2/3 rounded-full bg-muted-foreground/25" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BackgroundImageSection({
+  appearance,
+  onChange,
+}: {
+  appearance: AppearanceSettings;
+  onChange: (patch: Partial<AppearanceSettings>) => void;
+}) {
+  const { t } = useTranslation();
+  const hasImage = isBackgroundImageEnabled(appearance);
+
+  const handleBrowse = async () => {
+    const selected = await openDialog({
+      directory: false,
+      multiple: false,
+      filters: [
+        {
+          name: t("settings.backgroundImageFiles"),
+          extensions: BACKGROUND_IMAGE_EXTENSIONS,
+        },
+      ],
+      title: t("settings.selectBackgroundImage"),
+    });
+    const selectedPath = Array.isArray(selected) ? selected[0] : selected;
+    if (typeof selectedPath !== "string" || !selectedPath) return;
+
+    onChange({
+      background_image_path: selectedPath,
+      background_image_fit: normalizeBackgroundImageFit(
+        appearance.background_image_fit || DEFAULT_BACKGROUND_IMAGE_FIT,
+      ),
+      background_image_opacity:
+        appearance.background_image_opacity ?? DEFAULT_BACKGROUND_IMAGE_OPACITY,
+      ...(appearance.background_opacity >= 1
+        ? { background_opacity: DEFAULT_BACKGROUND_CONTENT_OPACITY }
+        : {}),
+    });
+  };
+
+  return (
+    <SettingSection
+      title={t("settings.backgroundImage")}
+      desc={t("settings.backgroundImageDesc")}
+      contentClassName="space-y-5"
+    >
+      <BackgroundPreview appearance={appearance} />
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex min-h-9 min-w-0 flex-1 items-center rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs">
+          {hasImage ? (
+            <span className="truncate font-mono text-foreground/85">
+              {appearance.background_image_path}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <MdImage className="text-sm" />
+              {t("settings.backgroundImageEmpty")}
+            </span>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full shrink-0 gap-1.5 sm:w-auto"
+          onClick={() => void handleBrowse()}
+        >
+          <MdFolderOpen className="text-sm" />
+          {t("settings.selectBackgroundImage")}
+        </Button>
+        {hasImage && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 sm:w-auto"
+            onClick={() => onChange({ background_image_path: null })}
+          >
+            <MdDeleteOutline className="text-sm" />
+            {t("settings.removeBackgroundImage")}
+          </Button>
+        )}
+      </div>
+
+      <SettingFieldGrid>
+        <SettingSelect
+          label={t("settings.backgroundImageFit")}
+          desc={t("settings.backgroundImageFitDesc")}
+          value={normalizeBackgroundImageFit(appearance.background_image_fit)}
+          disabled={!hasImage}
+          controlClassName="max-w-sm"
+          onValueChange={(value) =>
+            onChange({ background_image_fit: normalizeBackgroundImageFit(value) })
+          }
+        >
+          {BACKGROUND_IMAGE_FITS.map((fit) => (
+            <SelectItem key={fit} value={fit}>
+              {t(`settings.backgroundImageFit_${fit}`)}
+            </SelectItem>
+          ))}
+        </SettingSelect>
+
+        <PercentSlider
+          label={t("settings.backgroundImageOpacity")}
+          desc={t("settings.backgroundImageOpacityDesc")}
+          value={appearance.background_image_opacity ?? DEFAULT_BACKGROUND_IMAGE_OPACITY}
+          disabled={!hasImage}
+          onChange={(value) => onChange({ background_image_opacity: value })}
+        />
+
+        <PercentSlider
+          label={t("settings.backgroundContentOpacity")}
+          desc={t("settings.backgroundContentOpacityDesc", {
+            value: percentLabel(DEFAULT_BACKGROUND_CONTENT_OPACITY),
+          })}
+          value={appearance.background_opacity}
+          disabled={!hasImage}
+          onChange={(value) => onChange({ background_opacity: value })}
+        />
+      </SettingFieldGrid>
+    </SettingSection>
+  );
 }
 
 interface FontStackSectionProps {
@@ -194,6 +482,7 @@ function FontStackSection({
 export function AppearanceTab() {
   const { t } = useTranslation();
   const { appSettings, updateAppSettings } = useApp();
+  const appearance = appSettings.appearance;
   const [systemFontInfos, setSystemFontInfos] = useState<FontInfo[]>([]);
   const applicationFonts = useMemo(
     () =>
@@ -219,16 +508,17 @@ export function AppearanceTab() {
       .catch(console.error);
   }, []);
 
+  const updateAppearance = (patch: Partial<AppearanceSettings>) =>
+    updateAppSettings({ appearance: { ...appearance, ...patch } });
+
   return (
     <div className="space-y-5">
       <SettingSection contentClassName="space-y-5">
         <SettingSelect
           label={t("settings.theme")}
           desc={t("settings.themeDesc")}
-          value={appSettings.appearance.theme || "github-dark"}
-          onValueChange={(v) =>
-            updateAppSettings({ appearance: { ...appSettings.appearance, theme: v } })
-          }
+          value={appearance.theme || "github-dark"}
+          onValueChange={(v) => updateAppearance({ theme: v })}
         >
           {themeList.map((tm) => (
             <SelectItem key={tm.id} value={tm.id}>
@@ -240,13 +530,10 @@ export function AppearanceTab() {
         <SettingSelect
           label={t("settings.terminalTheme")}
           desc={t("settings.terminalThemeDesc")}
-          value={appSettings.appearance.terminal_theme || "__follow__"}
+          value={appearance.terminal_theme || "__follow__"}
           onValueChange={(v) =>
-            updateAppSettings({
-              appearance: {
-                ...appSettings.appearance,
-                terminal_theme: v === "__follow__" ? null : v,
-              },
+            updateAppearance({
+              terminal_theme: v === "__follow__" ? null : v,
             })
           }
         >
@@ -259,17 +546,19 @@ export function AppearanceTab() {
         </SettingSelect>
       </SettingSection>
 
+      <BackgroundImageSection appearance={appearance} onChange={updateAppearance} />
+
       <FontStackSection
         title={t("settings.uiFontFamily")}
         desc={t("settings.uiFontFamilyDesc")}
-        value={appSettings.appearance.ui_font_family}
+        value={appearance.ui_font_family}
         options={applicationFonts}
         builtInFonts={PACKAGE_BUILT_IN_FONTS}
         fallbackFont={UI_FALLBACK_FONT}
         previewFallback="sans-serif"
         onChange={(uiFontFamily) =>
-          updateAppSettings({
-            appearance: { ...appSettings.appearance, ui_font_family: uiFontFamily },
+          updateAppearance({
+            ui_font_family: uiFontFamily,
           })
         }
       />
@@ -277,14 +566,14 @@ export function AppearanceTab() {
       <FontStackSection
         title={t("settings.terminalFontFamily")}
         desc={t("settings.terminalFontFamilyDesc")}
-        value={appSettings.appearance.font_family}
+        value={appearance.font_family}
         options={terminalFonts}
         builtInFonts={TERMINAL_BUILT_IN_FONTS}
         fallbackFont={TERMINAL_FALLBACK_FONT}
         previewFallback="monospace"
         onChange={(terminalFontFamily) =>
-          updateAppSettings({
-            appearance: { ...appSettings.appearance, font_family: terminalFontFamily },
+          updateAppearance({
+            font_family: terminalFontFamily,
           })
         }
       />
@@ -295,14 +584,11 @@ export function AppearanceTab() {
             label={t("settings.fontSize")}
             min={MIN_TERMINAL_FONT_SIZE}
             max={MAX_TERMINAL_FONT_SIZE}
-            value={appSettings.appearance.font_size}
+            value={appearance.font_size}
             controlClassName="max-w-sm"
             onChange={(v) =>
-              updateAppSettings({
-                appearance: {
-                  ...appSettings.appearance,
-                  font_size: v || DEFAULT_TERMINAL_FONT_SIZE,
-                },
+              updateAppearance({
+                font_size: v || DEFAULT_TERMINAL_FONT_SIZE,
               })
             }
           />
@@ -310,21 +596,19 @@ export function AppearanceTab() {
             label={t("settings.uiFontSize")}
             min={12}
             max={24}
-            value={appSettings.appearance.ui_font_size}
+            value={appearance.ui_font_size}
             controlClassName="max-w-sm"
             onChange={(v) =>
-              updateAppSettings({
-                appearance: { ...appSettings.appearance, ui_font_size: v || 16 },
+              updateAppearance({
+                ui_font_size: v || 16,
               })
             }
           />
           <SettingSelect
             label={t("settings.cursorStyle")}
-            value={appSettings.appearance.cursor_style}
+            value={appearance.cursor_style}
             controlClassName="max-w-sm"
-            onValueChange={(v) =>
-              updateAppSettings({ appearance: { ...appSettings.appearance, cursor_style: v } })
-            }
+            onValueChange={(v) => updateAppearance({ cursor_style: v })}
           >
             <SelectItem value="block">{t("settings.cursorBlock")}</SelectItem>
             <SelectItem value="underline">{t("settings.cursorUnderline")}</SelectItem>
@@ -334,19 +618,15 @@ export function AppearanceTab() {
 
         <SettingRow label={t("settings.cursorBlink")}>
           <SettingSwitch
-            checked={appSettings.appearance.cursor_blink}
-            onChange={(v) =>
-              updateAppSettings({ appearance: { ...appSettings.appearance, cursor_blink: v } })
-            }
+            checked={appearance.cursor_blink}
+            onChange={(v) => updateAppearance({ cursor_blink: v })}
           />
         </SettingRow>
 
         <SettingRow label={t("settings.fontLigatures")} desc={t("settings.fontLigaturesDesc")}>
           <SettingSwitch
-            checked={appSettings.appearance.ligatures}
-            onChange={(v) =>
-              updateAppSettings({ appearance: { ...appSettings.appearance, ligatures: v } })
-            }
+            checked={appearance.ligatures}
+            onChange={(v) => updateAppearance({ ligatures: v })}
           />
         </SettingRow>
       </SettingSection>

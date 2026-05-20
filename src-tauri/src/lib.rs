@@ -54,6 +54,7 @@ pub fn run() {
             cmd::app::open_download_dir,
             cmd::app::open_transfer_target_directory,
             cmd::app::resolve_local_drop_paths,
+            cmd::app::read_background_image_data_url,
             cmd::ai::start_ai_chat_stream,
             cmd::ai::list_ai_model_names,
             cmd::ai::cancel_ai_chat_stream,

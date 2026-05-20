@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { type ILinkHandler, Terminal } from "@xterm/xterm";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MdCellTower, MdClose, MdLogout, MdPause, MdPlayArrow } from "react-icons/md";
 import { useTerminalAppSettings } from "@/context/AppContext";
@@ -19,6 +19,7 @@ import { useTerminalSearch } from "@/hooks/useTerminalSearch";
 import { useTerminalSettings } from "@/hooks/useTerminalSettings";
 import { emitAIErrorDetected } from "@/lib/aiEvents";
 import { renderAiCommandEnd, renderAiCommandStart } from "@/lib/aiTerminalRenderer";
+import { buildTerminalThemeColors } from "@/lib/backgroundImage";
 import { readClipboardText } from "@/lib/clipboard";
 import { invoke } from "@/lib/invoke";
 import { hexLuminance } from "@/lib/keywordHighlightPresets";
@@ -253,6 +254,10 @@ export default function XTerminal({
   const { t } = useTranslation();
   const terminalAppSettings = useTerminalAppSettings();
   const { appearance, interaction, terminal: terminalSettings } = terminalAppSettings;
+  const terminalThemeColors = useMemo(
+    () => buildTerminalThemeColors(terminalTheme.colors.terminal, appearance),
+    [appearance, terminalTheme.colors.terminal],
+  );
   const showLineNumbers = terminalSettings.show_line_numbers;
   const showTimestamps = terminalSettings.show_timestamps;
   const showGutter = showLineNumbers || showTimestamps;
@@ -458,7 +463,8 @@ export default function XTerminal({
       fontSize: appearance.font_size,
       fontFamily: appearance.font_family,
       wordSeparator: interaction.word_separators,
-      theme: { ...terminalTheme.colors.terminal },
+      theme: { ...terminalThemeColors },
+      allowTransparency: true,
       allowProposedApi: true,
     });
 
@@ -1361,7 +1367,7 @@ export default function XTerminal({
   useTerminalSettings(
     terminalRef,
     fitAddonRef,
-    terminalTheme,
+    terminalThemeColors,
     appearance,
     terminalSettings,
     interaction,

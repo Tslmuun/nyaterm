@@ -207,7 +207,7 @@ export default function TerminalGutter({
 
   return (
     <div
-      className="shrink-0 select-none overflow-hidden border-r"
+      className="nyaterm-wallpaper-transparent-surface shrink-0 select-none overflow-hidden border-r"
       style={{
         width: gutterWidth,
         paddingTop: layout.topPadding,

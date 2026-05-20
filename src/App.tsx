@@ -1512,6 +1512,7 @@ function App() {
       <AppLayout
         t={t}
         uiConfig={uiConfig}
+        appearance={appSettings.appearance}
         header={{
           onNewSession: () => handleNewSession(),
           onAbout: () => setShowAbout(true),

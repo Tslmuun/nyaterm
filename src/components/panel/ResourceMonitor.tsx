@@ -136,7 +136,7 @@ function SectionCard({
 }) {
   return (
     <div
-      className="rounded-lg border px-3 py-2.5 space-y-2 transition-colors duration-200"
+      className="nyaterm-wallpaper-card rounded-lg border px-3 py-2.5 space-y-2 transition-colors duration-200"
       style={{
         borderColor: accent
           ? "color-mix(in srgb, var(--df-primary) 30%, var(--df-border))"
@@ -231,7 +231,10 @@ export default function ResourceMonitor({ activeSessionId }: ResourceMonitorProp
   const memTotal = stats ? stats.memory.used + stats.memory.available : 0;
   const memUsedPct = memTotal > 0 ? (stats!.memory.used / memTotal) * 100 : 0;
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: "var(--df-bg-panel)" }}>
+    <div
+      className="nyaterm-wallpaper-transparent-surface h-full flex flex-col"
+      style={{ backgroundColor: "var(--df-bg-panel)" }}
+    >
       <PanelHeader
         title={t("panel.resourceMonitor")}
         actions={

@@ -18,6 +18,12 @@ pub struct AppearanceSettings {
     pub ligatures: bool,
     #[serde(default = "default_opacity")]
     pub background_opacity: f64,
+    #[serde(default)]
+    pub background_image_path: Option<String>,
+    #[serde(default = "default_background_image_fit")]
+    pub background_image_fit: String,
+    #[serde(default = "default_background_image_opacity")]
+    pub background_image_opacity: f64,
     #[serde(default = "default_cursor_style")]
     pub cursor_style: String,
     #[serde(default = "default_true")]
@@ -43,6 +49,12 @@ fn default_font_size() -> f64 {
 fn default_opacity() -> f64 {
     1.0
 }
+fn default_background_image_fit() -> String {
+    "cover".to_string()
+}
+fn default_background_image_opacity() -> f64 {
+    0.45
+}
 fn default_cursor_style() -> String {
     "block".to_string()
 }
@@ -59,6 +71,9 @@ impl Default for AppearanceSettings {
             font_size: default_font_size(),
             ligatures: false,
             background_opacity: default_opacity(),
+            background_image_path: None,
+            background_image_fit: default_background_image_fit(),
+            background_image_opacity: default_background_image_opacity(),
             cursor_style: default_cursor_style(),
             cursor_blink: true,
             ui_font_size: default_ui_font_size(),

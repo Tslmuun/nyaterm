@@ -118,6 +118,23 @@ body,
   user-select: text;
 }
 
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .xterm,
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .xterm .xterm-viewport,
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .xterm .xterm-screen,
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .xterm .xterm-screen canvas {
+  background-color: transparent !important;
+}
+
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .nyaterm-wallpaper-transparent-surface {
+  background-color: transparent !important;
+}
+
+.nyaterm-wallpaper-shell[data-wallpaper-enabled="true"] .nyaterm-wallpaper-card {
+  background-color: color-mix(in srgb, var(--df-bg) 55%, transparent) !important;
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+}
+
 .xterm .xterm-link-popup {
   position: absolute;
   z-index: 20;

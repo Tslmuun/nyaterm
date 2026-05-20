@@ -14,6 +14,7 @@ type LogDomain =
   | "transfer.lifecycle"
   | "watcher.sync"
   | "security.flow"
+  | "background-image"
   | "updater.flow";
 
 type StableLogIdKey = "session_id" | "connection_id" | "transfer_id" | "tunnel_id" | "request_id";

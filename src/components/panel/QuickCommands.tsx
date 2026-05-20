@@ -297,7 +297,10 @@ function QuickCommands({ onSend, onSendToAll }: QuickCommandsProps) {
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="h-full flex flex-col" style={{ backgroundColor: "var(--df-bg-panel)" }}>
+      <div
+        className="nyaterm-wallpaper-transparent-surface h-full flex flex-col"
+        style={{ backgroundColor: "var(--df-bg-panel)" }}
+      >
         <PanelHeader
           title={t("panel.quickCommands")}
           meta={

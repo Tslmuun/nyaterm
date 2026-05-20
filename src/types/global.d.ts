@@ -304,6 +304,7 @@ export interface RemoteStatsCpu {
   model: string;
   cores: number;
   usage: number;
+  per_core: number[];
 }
 
 export interface RemoteStatsMemory {
@@ -379,6 +380,8 @@ export interface GeneralSettings {
   confirm_on_close: boolean;
 }
 
+export type BackgroundImageFit = "cover" | "contain" | "stretch" | "tile";
+
 export interface AppearanceSettings {
   theme: string;
   font_family: string;
@@ -386,6 +389,9 @@ export interface AppearanceSettings {
   font_size: number;
   ligatures: boolean;
   background_opacity: number;
+  background_image_path: string | null;
+  background_image_fit: BackgroundImageFit;
+  background_image_opacity: number;
   cursor_style: string;
   cursor_blink: boolean;
   ui_font_size: number;

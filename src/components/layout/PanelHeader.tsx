@@ -19,7 +19,7 @@ export default function PanelHeader({
   return (
     <div
       className={cn(
-        "flex min-h-9 shrink-0 items-center justify-between gap-3 border-b px-3",
+        "nyaterm-wallpaper-transparent-surface flex min-h-9 shrink-0 items-center justify-between gap-3 border-b px-3",
         className,
       )}
       style={{

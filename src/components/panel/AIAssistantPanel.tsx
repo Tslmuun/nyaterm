@@ -1554,7 +1554,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
 
   return (
     <div
-      className="relative flex h-full flex-col"
+      className="nyaterm-wallpaper-transparent-surface relative flex h-full flex-col"
       style={{ backgroundColor: "var(--df-bg-panel)" }}
       onPointerDownCapture={(event) => {
         const target = event.target as Node;

@@ -90,7 +90,7 @@ function ActiveSessions({
       />
 
       <div
-        className="border-b px-2 py-1.5"
+        className="nyaterm-wallpaper-transparent-surface border-b px-2 py-1.5"
         style={{ borderColor: "var(--df-border)", backgroundColor: "var(--df-bg-panel)" }}
       >
         <div className="relative shrink-0">

@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use base64::Engine;
+
 use crate::error::{AppError, AppResult};
 
 #[derive(serde::Serialize)]
@@ -62,6 +64,54 @@ pub fn resolve_local_drop_paths(paths: Vec<String>) -> AppResult<Vec<LocalDropPa
     }
 
     Ok(resolved)
+}
+
+const MAX_BACKGROUND_IMAGE_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
+
+#[tauri::command]
+pub fn read_background_image_data_url(path: String) -> AppResult<String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Config("Background image path is empty".to_string()));
+    }
+
+    let path = PathBuf::from(trimmed);
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase);
+
+    let mime = match extension.as_deref() {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("bmp") => "image/bmp",
+        _ => {
+            return Err(AppError::Config(
+                "Unsupported background image format".to_string(),
+            ));
+        }
+    };
+
+    let metadata = std::fs::metadata(&path).map_err(|_| {
+        AppError::Config(format!(
+            "Background image file not found: {}",
+            path.display()
+        ))
+    })?;
+
+    if metadata.len() > MAX_BACKGROUND_IMAGE_SIZE {
+        return Err(AppError::Config(format!(
+            "Background image too large ({:.1} MB, max {:.0} MB)",
+            metadata.len() as f64 / (1024.0 * 1024.0),
+            MAX_BACKGROUND_IMAGE_SIZE as f64 / (1024.0 * 1024.0),
+        )));
+    }
+
+    let bytes = std::fs::read(&path)?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+    Ok(format!("data:{mime};base64,{encoded}"))
 }
 
 fn resolve_download_dir(app: &tauri::AppHandle) -> AppResult<PathBuf> {

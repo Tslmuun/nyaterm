@@ -355,7 +355,7 @@ export default function FileTransfer({ activeSessionId }: FileTransferProps) {
 
   return (
     <aside
-      className="h-full flex flex-col overflow-hidden"
+      className="nyaterm-wallpaper-transparent-surface h-full flex flex-col overflow-hidden"
       style={{ backgroundColor: "var(--df-bg-panel)" }}
     >
       <PanelHeader

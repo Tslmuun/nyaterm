@@ -1948,7 +1948,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
 
   return (
     <aside
-      className="h-full flex flex-col overflow-hidden"
+      className="nyaterm-wallpaper-transparent-surface h-full flex flex-col overflow-hidden"
       style={{ backgroundColor: "var(--df-bg-panel)" }}
       onMouseDownCapture={handlePanelMouseDownCapture}
       onMouseUpCapture={handlePanelMouseUpCapture}
@@ -1957,7 +1957,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
 
       {canBrowseFiles && (
         <div
-          className="relative flex items-center px-1.5 py-1 border-b gap-0.5"
+          className="nyaterm-wallpaper-transparent-surface relative flex items-center px-1.5 py-1 border-b gap-0.5"
           style={{ backgroundColor: "var(--df-bg-panel)", borderColor: "var(--df-border)" }}
         >
           <ToolbarIconButton
@@ -2070,7 +2070,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
 
           {isFileSearchExpanded && (
             <div
-              className="absolute inset-x-1.5 top-1 bottom-1 z-20 flex items-center gap-1 rounded-md border px-1.5 shadow-sm"
+              className="nyaterm-wallpaper-transparent-surface absolute inset-x-1.5 top-1 bottom-1 z-20 flex items-center gap-1 rounded-md border px-1.5 shadow-sm"
               style={{
                 backgroundColor: "var(--df-bg-panel)",
                 borderColor: "var(--df-primary)",
@@ -2208,7 +2208,7 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
               ) : (
                 <>
                   <div
-                    className="sticky top-0 z-[1] h-7 border-b"
+                    className="nyaterm-wallpaper-transparent-surface sticky top-0 z-[1] h-7 border-b"
                     style={{
                       backgroundColor: "var(--df-bg-section-header)",
                       borderColor: "var(--df-border)",

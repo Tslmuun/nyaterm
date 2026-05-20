@@ -32,7 +32,10 @@ export default function SecurityAuthPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: "var(--df-bg-panel)" }}>
+    <div
+      className="nyaterm-wallpaper-transparent-surface h-full flex flex-col"
+      style={{ backgroundColor: "var(--df-bg-panel)" }}
+    >
       <PanelHeader
         title={t("securityAuth.title")}
         actions={

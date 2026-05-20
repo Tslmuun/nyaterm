@@ -2,24 +2,26 @@ import type { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import type { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
+import { shouldSuspendTerminalWebglForBackground } from "@/lib/backgroundImage";
+import type { TerminalColors } from "@/lib/themes";
 import type { AppSettings } from "@/types/global";
 
 export function useTerminalSettings(
   terminalRef: React.RefObject<Terminal | null>,
   fitAddonRef: React.RefObject<FitAddon | null>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  terminalTheme: any,
+  terminalThemeColors: TerminalColors,
   appearance: AppSettings["appearance"],
   terminalSettings: AppSettings["terminal"],
   interaction: AppSettings["interaction"],
 ) {
   const webglAddonRef = useRef<WebglAddon | null>(null);
+  const suspendWebglForBackground = shouldSuspendTerminalWebglForBackground(appearance);
 
   // React to hardware acceleration settings changes
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    if (terminalSettings.hardware_acceleration) {
+    if (terminalSettings.hardware_acceleration && !suspendWebglForBackground) {
       if (!webglAddonRef.current) {
         try {
           const webgl = new WebglAddon();
@@ -46,13 +48,15 @@ export function useTerminalSettings(
         webglAddonRef.current = null;
       }
     };
-  }, [terminalSettings.hardware_acceleration, terminalRef]);
+  }, [terminalSettings.hardware_acceleration, suspendWebglForBackground, terminalRef]);
   // React to terminal theme changes: update terminal colors dynamically
   useEffect(() => {
     if (terminalRef.current) {
-      terminalRef.current.options.theme = { ...terminalTheme.colors.terminal };
+      terminalRef.current.options.theme = { ...terminalThemeColors };
+      terminalRef.current.clearTextureAtlas();
+      terminalRef.current.refresh(0, Math.max(0, terminalRef.current.rows - 1));
     }
-  }, [terminalTheme, terminalRef]);
+  }, [terminalThemeColors, terminalRef]);
 
   // React to appearance settings changes: font family, size, cursor etc
   useEffect(() => {

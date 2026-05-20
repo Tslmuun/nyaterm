@@ -307,7 +307,7 @@ export default function NetworkPanel() {
 
   return (
     <aside
-      className="flex h-full flex-col overflow-hidden"
+      className="nyaterm-wallpaper-transparent-surface flex h-full flex-col overflow-hidden"
       style={{ backgroundColor: "var(--df-bg-panel)" }}
     >
       <PanelHeader

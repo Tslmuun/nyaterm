@@ -925,7 +925,7 @@ export default function SavedConnections({
         />
 
         <div
-          className="flex items-center gap-1.5 px-2 py-1.5 shrink-0 border-b"
+          className="nyaterm-wallpaper-transparent-surface flex items-center gap-1.5 px-2 py-1.5 shrink-0 border-b"
           style={{
             borderColor: "color-mix(in srgb, var(--df-border) 40%, transparent)",
             backgroundColor: "var(--df-bg-section-header)",
