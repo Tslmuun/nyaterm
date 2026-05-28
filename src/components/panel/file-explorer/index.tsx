@@ -139,6 +139,13 @@ function buildRemoteUploadPath(remoteDir: string, name: string) {
   return remoteDir === "/" ? `/${name}` : `${remoteDir}/${name}`;
 }
 
+function getRemoteParentDirectory(path: string) {
+  const normalized = normalizeDirectoryPath(path);
+  if (!normalized || normalized === "/") return "/";
+  const index = normalized.lastIndexOf("/");
+  return index <= 0 ? "/" : normalized.slice(0, index);
+}
+
 function isDropPositionInsideElement(
   position: { x: number; y: number },
   element: HTMLElement | null,
@@ -410,9 +417,14 @@ function buildSessionCacheSnapshot(
 }
 
 /** Remote file browser for active SSH session. Lists dirs/files, supports navigation. */
-function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps) {
+function FileExplorer({
+  activeSessionId,
+  activeSessionType,
+  activeConnectionId,
+}: FileExplorerProps) {
   const { t } = useTranslation();
-  const { appSettings } = useApp();
+  const { appSettings, updateUi } = useApp();
+  const { enqueueUploads } = useTransfer();
   const canBrowseFiles = !!activeSessionId && activeSessionType === "SSH";
   const hasUnsupportedSession =
     !!activeSessionId && !!activeSessionType && activeSessionType !== "SSH";
@@ -446,7 +458,6 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
   const [propertiesDialogData, setPropertiesDialogData] = useState<PropertiesDialogData | null>(
     null,
   );
-  const [autoSyncCwd, setAutoSyncCwd] = useState(false);
   const [cwdTrackingActive, setCwdTrackingActive] = useState(false);
   const alwaysUploadFilesRef = useRef<Set<string>>(new Set());
   const filesRef = useRef<FileEntry[]>([]);
@@ -483,6 +494,8 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
   const resetExternalDropHover = useCallback(() => {
     setIsExternalDropActive(false);
   }, []);
+  const autoSyncConnectionIds = appSettings.ui.file_explorer_auto_sync_cwd_connection_ids ?? [];
+  const autoSyncCwd = !!activeConnectionId && autoSyncConnectionIds.includes(activeConnectionId);
   const listScrollResetKey = `${activeSessionId ?? ""}:${currentPath}`;
   const listFilterResetKey = `${fileSearchQuery}:${fileSortMode.column}:${fileSortMode.direction}`;
 
@@ -609,7 +622,6 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
   useEffect(() => {
     if (!canBrowseFiles || !activeSessionId) {
       setCwdTrackingActive(false);
-      setAutoSyncCwd(false);
       return;
     }
     invoke<SessionInfo[]>("list_sessions")
@@ -617,11 +629,9 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
         const s = sessions.find((s) => s.id === activeSessionId);
         const active = s?.injection_active ?? false;
         setCwdTrackingActive(active);
-        if (!active) setAutoSyncCwd(false);
       })
       .catch(() => {
         setCwdTrackingActive(false);
-        setAutoSyncCwd(false);
       });
   }, [activeSessionId, canBrowseFiles]);
 
@@ -1625,6 +1635,19 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
     }
   }, [activeSessionId, loadDirectory, t]);
 
+  const handleToggleAutoSyncCwd = useCallback(() => {
+    if (!activeConnectionId) return;
+    updateUi((prev) => {
+      const currentIds = prev.file_explorer_auto_sync_cwd_connection_ids ?? [];
+      const enabled = currentIds.includes(activeConnectionId);
+      return {
+        file_explorer_auto_sync_cwd_connection_ids: enabled
+          ? currentIds.filter((id) => id !== activeConnectionId)
+          : [...currentIds, activeConnectionId],
+      };
+    });
+  }, [activeConnectionId, updateUi]);
+
   useEffect(() => {
     if (!autoSyncCwd || !activeSessionId) return;
     const unlisten = listen<string>(`cwd-changed-${activeSessionId}`, (event) => {
@@ -2547,8 +2570,8 @@ function FileExplorer({ activeSessionId, activeSessionType }: FileExplorerProps)
                           : "text-muted-foreground hover:text-foreground"
                         : "text-muted-foreground"
                     }`}
-                    onClick={() => setAutoSyncCwd((v) => !v)}
-                    disabled={!cwdTrackingActive}
+                    onClick={handleToggleAutoSyncCwd}
+                    disabled={!cwdTrackingActive || !activeConnectionId}
                   >
                     <MdSyncLock className="h-[0.875rem] w-[0.875rem]" />
                   </Button>

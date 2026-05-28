@@ -221,6 +221,8 @@ pub struct UiConfig {
     #[serde(default = "default_transfer_height")]
     pub transfer_height: f64,
     #[serde(default)]
+    pub file_explorer_auto_sync_cwd_connection_ids: Vec<String>,
+    #[serde(default)]
     pub activity_bar_layout: ActivityBarLayout,
 }
 
@@ -291,6 +293,7 @@ impl Default for UiConfig {
             saved_connections_sort_mode: default_sort_mode(),
             recent_connection_ids: vec![],
             transfer_height: default_transfer_height(),
+            file_explorer_auto_sync_cwd_connection_ids: vec![],
             activity_bar_layout: ActivityBarLayout::default(),
         }
     }

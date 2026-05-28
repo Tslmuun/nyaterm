@@ -68,6 +68,7 @@ export default function AppPanelContent({
               <FileExplorer
                 activeSessionId={activeSessionId}
                 activeSessionType={liveActivePane ? liveActivePane.type : null}
+                activeConnectionId={liveActivePane?.connectionId ?? null}
               />
             </div>
             <ResizeHandle direction="vertical" onResize={onTransferResize} />

@@ -5,13 +5,7 @@ import {
   DEFAULT_COMMAND_SUGGESTION_MAX_CHARS,
   DEFAULT_COMMAND_SUGGESTION_MIN_CHARS,
 } from "@/lib/interactionSettings";
-import type {
-  AppRuntimeInfo,
-  AppSettings,
-  Group,
-  SavedConnection,
-  UiConfig,
-} from "@/types/global";
+import type { AppRuntimeInfo, AppSettings, Group, SavedConnection, UiConfig } from "@/types/global";
 import i18n from "../i18n";
 import { invoke } from "../lib/invoke";
 import { logger, setLoggerLevel } from "../lib/logger";
@@ -123,6 +117,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     saved_connections_sort_mode: "default",
     recent_connection_ids: [],
     transfer_height: 180,
+    file_explorer_auto_sync_cwd_connection_ids: [],
     activity_bar_layout: {
       left_top: ["fileExplorer", "network", "securityAuth"],
       left_bottom: ["syncBackupHistory", "settings"],

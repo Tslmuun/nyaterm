@@ -295,6 +295,7 @@ export interface UiConfig {
   saved_connections_sort_mode?: string;
   recent_connection_ids: string[];
   transfer_height: number;
+  file_explorer_auto_sync_cwd_connection_ids: string[];
   activity_bar_layout: ActivityBarLayout;
 }
 
@@ -778,6 +779,7 @@ export interface FileEntry {
 export interface FileExplorerProps {
   activeSessionId: string | null;
   activeSessionType: SessionType | null;
+  activeConnectionId?: string | null;
 }
 
 export interface WebdavSyncSettings {
